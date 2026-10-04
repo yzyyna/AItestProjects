@@ -8,7 +8,7 @@
 ## 📁 目录与版本结构
 
 ```
-space-energy/
+stellar-fusion/
 ├── index.html            # 聚合门户主页（双版本直观对比与内嵌切换预览）
 ├── README.md             # 本说明文档
 ├── gemini/               # Google Gemini 生成版本（HELIOS-X Command）
@@ -40,13 +40,13 @@ space-energy/
 ## 🚀 启动与体验方式
 
 1. **直接双击运行（免服务）**：
-   - 双击 `space-energy/index.html` 打开聚合门户，支持一键在页面内切换预览或新窗口打开各版本。
+   - 双击 `stellar-fusion/index.html` 打开聚合门户，支持一键在页面内切换预览或新窗口打开各版本。
    - 亦可直接双击 `gemini/index.html` 或 `musespark/index.html` 进行独立体验。
 2. **通过本地静态服务**：
    ```bash
    cd /Users/fortrust/Documents/AItestProjects
    python3 -m http.server 8080
    ```
-   - 访问门户：[http://localhost:8080/space-energy/](http://localhost:8080/space-energy/)
-   - 直达 Gemini 版：[http://localhost:8080/space-energy/gemini/](http://localhost:8080/space-energy/gemini/)
-   - 直达 MuseSpark 版：[http://localhost:8080/space-energy/musespark/](http://localhost:8080/space-energy/musespark/)
+   - 访问门户：[http://localhost:8080/stellar-fusion/](http://localhost:8080/stellar-fusion/)
+   - 直达 Gemini 版：[http://localhost:8080/stellar-fusion/gemini/](http://localhost:8080/stellar-fusion/gemini/)
+   - 直达 MuseSpark 版：[http://localhost:8080/stellar-fusion/musespark/](http://localhost:8080/stellar-fusion/musespark/)
