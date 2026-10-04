@@ -93,6 +93,15 @@ button,input,select,textarea{font:inherit}
 .mobile-toggle{display:none}
 @media(max-width:900px){.sidebar{position:fixed;inset:58px 0 0 0;transform:translateX(-100%);transition:.22s;z-index:35}.sidebar.open{transform:none}.mobile-toggle{display:inline-flex}}
 .tag{padding:2px 6px;border-radius:999px;border:1px solid var(--border);background:var(--panel);font-size:11px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:320px;color:var(--muted);gap:12px;text-align:center}
+.empty-state i{font-size:36px;font-style:normal;opacity:.6}
+.empty-state p{margin:0;font-size:13px}
+.tree-toggle{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;cursor:pointer;user-select:none;font-size:11px;color:var(--muted);transition:all .15s}
+.tree-toggle:hover{background:var(--border);color:var(--text)}
+.chart-tooltip{position:absolute;background:rgba(15,23,42,.92);backdrop-filter:blur(4px);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-family:ui-monospace,monospace;pointer-events:none;display:none;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.1)}
+[data-theme=dark] .chart-tooltip{background:rgba(2,6,23,.95);border-color:rgba(255,255,255,.15)}
+.alarm-link{color:var(--primary);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.alarm-link:hover{color:var(--primary2)}
 </style>
 </head>
 <body>
@@ -262,7 +271,7 @@ const defaultGroups=[
 const bus=new EventBus();
 const errorManager=new ErrorManager(bus);
 const store=new Store({
-  devices:[], deviceMap:new Map(), groups:storage.get('groups',defaultGroups), tags:storage.get('tags',['高优','核心','边缘','实验']), alarms:[], filters:{search:'',nameOp:'',nameVal:'',cpuOp:'',cpuVal:'',tempOp:'',tempVal:'',latOp:'',latVal:'',status:'',region:[],logic:'AND'}, sorting:[], selection:new Set(), selectedGroup:'g_root', ui:{paused:false,theme:storage.get('theme','light'),connection:'connected'}, tasks:{total:0,success:0,failed:0,running:0,progress:0}, history:[]
+  devices:[], deviceMap:new Map(), groups:storage.get('groups',defaultGroups), collapsedGroups:new Set(), tags:storage.get('tags',['高优','核心','边缘','实验']), alarms:[], filters:{search:'',nameOp:'',nameVal:'',cpuOp:'',cpuVal:'',tempOp:'',tempVal:'',latOp:'',latVal:'',status:'',region:[],logic:'AND'}, sorting:[], selection:new Set(), selectedGroup:'g_root', ui:{paused:false,theme:storage.get('theme','light'),connection:'connected'}, tasks:{total:0,success:0,failed:0,running:0,progress:0}, history:[]
 });
 
 /* ========== Data generation ========== */
@@ -335,31 +344,107 @@ function stableSort(arr, sorting){
 
 /* ========== VirtualList ========== */
 class VirtualList{
-  constructor(viewport, content, phantom, rowH=40, buffer=12){this.vp=viewport;this.ct=content;this.ph=phantom;this.rowH=rowH;this.buffer=buffer;this.data=[];this.start=0;this.end=0;this.onScroll=this.onScroll.bind(this);this.vp.addEventListener('scroll',this.onScroll);this.renderCount=0;this.avgMs=0}
-  setData(data){this.data=data;this.ph.style.height=(data.length*this.rowH)+'px';this.updateVisibleRange();this.render()}
-  updateVisibleRange(){const st=this.vp.scrollTop, vh=this.vp.clientHeight; const start=Math.max(0,Math.floor(st/this.rowH)-this.buffer); const vis=Math.ceil(vh/this.rowH)+this.buffer*2; const end=Math.min(this.data.length,start+vis); this.start=start;this.end=end}
-  onScroll(){this.updateVisibleRange();requestAnimationFrame(()=>this.render())}
-  scrollToIndex(idx){const top=idx*this.rowH; this.vp.scrollTop=top}
+  constructor(viewport, content, phantom, rowH=40, buffer=12){
+    this.vp=viewport;
+    this.ct=content;
+    this.ph=phantom;
+    this.rowH=rowH;
+    this.buffer=buffer;
+    this.data=[];
+    this.start=0;
+    this.end=0;
+    this.onScroll=this.onScroll.bind(this);
+    this.onResize=debounce(this.onResize.bind(this),100);
+    this.vp.addEventListener('scroll',this.onScroll);
+    window.addEventListener('resize',this.onResize);
+    this.renderCount=0;
+    this.avgMs=0;
+  }
+  setData(data){
+    this.data=data;
+    const totalH=data.length*this.rowH;
+    this.ph.style.height=totalH+'px';
+    const maxScroll=Math.max(0, totalH - this.vp.clientHeight);
+    if(this.vp.scrollTop > maxScroll){
+      this.vp.scrollTop = maxScroll;
+    }
+    this.updateVisibleRange();
+    this.render();
+  }
+  onResize(){
+    this.updateVisibleRange();
+    this.render();
+  }
+  updateVisibleRange(){
+    const st=this.vp.scrollTop, vh=this.vp.clientHeight||500;
+    const start=Math.max(0,Math.floor(st/this.rowH)-this.buffer);
+    const vis=Math.ceil(vh/this.rowH)+this.buffer*2;
+    const end=Math.min(this.data.length,start+vis);
+    this.start=start;
+    this.end=end;
+  }
+  onScroll(){
+    this.updateVisibleRange();
+    requestAnimationFrame(()=>this.render());
+  }
+  scrollToIndex(idx){
+    const safeIdx=clamp(idx,0,Math.max(0,this.data.length-1));
+    this.vp.scrollTop=safeIdx*this.rowH;
+  }
   render(){
     const t0=performance.now(); this.renderCount++;
-    const frag=document.createDocumentFragment(); this.ct.style.transform=`translateY(${this.start*this.rowH}px)`; this.ct.innerHTML='';
+    if(!this.data.length){
+      this.ct.style.transform='none';
+      this.ct.innerHTML='<div class="empty-state"><i>🔍</i><p>未找到符合条件的设备</p><button class="btn small" onclick="document.getElementById(\'btnClearFilter\').click()">重置所有筛选</button></div>';
+      $('#dRendered')&&($('#dRendered').textContent=0);
+      return;
+    }
+    const frag=document.createDocumentFragment();
+    this.ct.style.transform=`translateY(${this.start*this.rowH}px)`;
+    this.ct.innerHTML='';
     const sel=store.getState().selection;
-    for(let i=this.start;i<this.end;i++){const d=this.data[i]; if(!d) break; const row=document.createElement('div');row.className='row'+(sel.has(d.id)?' sel':'');row.dataset.id=d.id;row.draggable=true;row.innerHTML=`<div><input type="checkbox" ${sel.has(d.id)?'checked':''}></div><div class="id">${d.id}</div><div>${d.name}</div><div>${d.cpu}%<div class="meter"><i style="width:${clamp(d.cpu,0,100)}%"></i></div></div><div>${fmt(d.temperature)}°C</div><div>${fmt(d.power)}W</div><div>${d.latency}ms</div><div>${d.battery}%</div><div><span class="tag">${d.region}</span> ${d.city}</div><div><span class="status ${d.status}">${d.status}</span></div>`;
+    for(let i=this.start;i<this.end;i++){
+      const d=this.data[i]; if(!d) break;
+      const row=document.createElement('div');
+      row.className='row'+(sel.has(d.id)?' sel':'');
+      row.dataset.id=d.id;
+      row.draggable=true;
+      row.innerHTML=`<div><input type="checkbox" ${sel.has(d.id)?'checked':''}></div><div class="id">${d.id}</div><div>${d.name}</div><div>${d.cpu}%<div class="meter"><i style="width:${clamp(d.cpu,0,100)}%"></i></div></div><div>${fmt(d.temperature)}°C</div><div>${fmt(d.power)}W</div><div>${d.latency}ms</div><div>${d.battery}%</div><div><span class="tag">${d.region}</span> ${d.city}</div><div><span class="status ${d.status}">${d.status}</span></div>`;
       row.addEventListener('click',(e)=>{ if(e.target.type==='checkbox'){toggleSelection(d.id,e)} else {handleRowClick(d.id,e)} });
       row.addEventListener('dragstart',(e)=>{e.dataTransfer.setData('text/plain',d.id);e.dataTransfer.effectAllowed='move'});
       frag.appendChild(row);
     }
     this.ct.appendChild(frag);
-    const dt=performance.now()-t0; this.avgMs=this.avgMs*0.9+dt*0.1; $('#dRendered')&&( $('#dRendered').textContent=this.end-this.start); $('#dRenderMs')&&( $('#dRenderMs').textContent=fmt(this.avgMs,1));
+    const dt=performance.now()-t0;
+    this.avgMs=this.avgMs*0.9+dt*0.1;
+    $('#dRendered')&&($('#dRendered').textContent=this.end-this.start);
+    $('#dRenderMs')&&($('#dRenderMs').textContent=fmt(this.avgMs,1));
   }
-  destroy(){this.vp.removeEventListener('scroll',this.onScroll)}
+  destroy(){
+    this.vp.removeEventListener('scroll',this.onScroll);
+    window.removeEventListener('resize',this.onResize);
+  }
 }
 
 /* ========== SelectionManager helpers ========== */
 let lastSel=null;
 function toggleSelection(id,e){
   const s=new Set(store.getState().selection);
-  if(e.shiftKey && lastSel){const list=filteredSorted; const a=list.findIndex(x=>x.id===lastSel), b=list.findIndex(x=>x.id===id); const [lo,hi]=[Math.min(a,b),Math.max(a,b)]; for(let i=lo;i<=hi;i++) s.add(list[i].id);} else if(e.ctrlKey||e.metaKey){ if(s.has(id)) s.delete(id); else s.add(id)} else { if(s.has(id) && s.size===1) s.delete(id); else {s.clear(); s.add(id)} }
+  if(e.shiftKey && lastSel){
+    const list=filteredSorted;
+    const a=list.findIndex(x=>x.id===lastSel), b=list.findIndex(x=>x.id===id);
+    if(a!==-1 && b!==-1){
+      const [lo,hi]=[Math.min(a,b),Math.max(a,b)];
+      for(let i=lo;i<=hi;i++) s.add(list[i].id);
+    } else {
+      s.add(id);
+    }
+  } else if(e.ctrlKey||e.metaKey){
+    if(s.has(id)) s.delete(id); else s.add(id);
+  } else {
+    if(s.has(id) && s.size===1) s.delete(id);
+    else { s.clear(); s.add(id); }
+  }
   lastSel=id; store.setState({selection:s}); updateSelectInfo(); vlist.render();
 }
 function handleRowClick(id,e){
@@ -458,15 +543,38 @@ function flushUpdates(){
   upsCounter+=batch.length;
   // apply alarm dedup
   for(const d of batch) alarmManager.evaluate(d);
-  // if any device in current filtered view changed, re-filter/sort lazily via debounced refresh
-  scheduleRefresh();
+  // smart refresh
+  scheduleRefresh(batch);
   // update header stats
   updateHeader();
   // if drawer open, refresh it if its device updated
   if(currentDrawerId && batch.some(d=>d.id===currentDrawerId)) renderDrawer(currentDrawerId, true);
 }
 let refreshTimer=null;
-function scheduleRefresh(){ clearTimeout(refreshTimer); refreshTimer=setTimeout(()=>{ recompute(); }, 80); }
+function scheduleRefresh(batch){
+  const filters=getActiveFilters();
+  const sorting=getSorting();
+  const hasDynamicFilter = Boolean(filters.cpuOp || filters.tempOp || filters.latOp);
+  const dynamicSortKeys = new Set(['temperature','cpu','power','voltage','current','latency','battery']);
+  const hasDynamicSort = sorting.some(s => dynamicSortKeys.has(s.key));
+
+  if(!hasDynamicFilter && !hasDynamicSort){
+    if(batch && vlist && vlist.data.length){
+      const visibleIds = new Set();
+      for(let i=vlist.start; i<vlist.end; i++){
+        if(vlist.data[i]) visibleIds.add(vlist.data[i].id);
+      }
+      const needRerender = batch.some(d => visibleIds.has(d.id));
+      if(needRerender){
+        requestAnimationFrame(()=>vlist.render());
+      }
+      return;
+    }
+  }
+
+  clearTimeout(refreshTimer);
+  refreshTimer=setTimeout(()=>{ recompute(); }, 120);
+}
 
 /* ========== Filtering + Sorting pipeline ========== */
 let filteredSorted=[];
@@ -509,15 +617,19 @@ function updateHeader(){
 function updateSelectInfo(){ $('#selectInfo').textContent=`已选: ${store.getState().selection.size}`; $('#chkHead').checked=store.getState().selection.size && store.getState().selection.size===filteredSorted.length; }
 function renderAlarms(){
   const list=$('#alarmList'); const lvl=$('#alarmLevel').value; const alarms=store.getState().alarms.filter(a=> !lvl || a.level===lvl).slice(0,200);
-  list.innerHTML=alarms.map(a=>`<div class="alarm"><div><b>${a.type} · ${a.level}</b> <small>${a.deviceId} 值 ${fmt(a.value)} 阈值 ${a.threshold}</small><br><small>${new Date(a.timestamp).toLocaleString()}</small></div><span style="display:flex;gap:6px"><button class="btn small" data-ack="${a.id}">${a.acknowledged?'已确认':'确认'}</button><button class="btn small" data-del="${a.id}">删除</button></span></div>`).join('')||'<small style="color:var(--muted)">暂无告警</small>';
+  list.innerHTML=alarms.map(a=>`<div class="alarm"><div><b>${a.type} · ${a.level}</b> <small><span class="alarm-link" data-dev="${a.deviceId}">${a.deviceId}</span> 值 ${fmt(a.value)} 阈值 ${a.threshold}</small><br><small>${new Date(a.timestamp).toLocaleString()}</small></div><span style="display:flex;gap:6px"><button class="btn small" data-ack="${a.id}">${a.acknowledged?'已确认':'确认'}</button><button class="btn small" data-del="${a.id}">删除</button></span></div>`).join('')||'<small style="color:var(--muted)">暂无告警</small>';
 }
 function renderGroups(){
   const groups=store.getState().groups; const sel=store.getState().selectedGroup; const map=new Map(groups.map(g=>[g.id,g])); const roots=groups.filter(g=>!g.parent);
+  const collapsed = store.getState().collapsedGroups || new Set();
   function renderNode(g,depth=0){
     const kids=(g.children||[]).map(id=>map.get(id)).filter(Boolean);
     const active=sel===g.id?' active':'';
-    let html=`<div class="node${active}" draggable="true" data-gid="${g.id}" style="margin-left:${depth*8}px"><span>${g.children?.length?'▾':'·'}</span> <b>${g.name}</b> <small style="color:var(--muted)">(${store.getState().devices.filter(d=>d.groupIds.includes(g.id)).length})</small></div>`;
-    if(kids.length) html+=`<div class="children">${kids.map(k=>renderNode(k,depth+1)).join('')}</div>`;
+    const hasKids=kids.length>0;
+    const isCol=collapsed.has(g.id);
+    const toggleSymbol=hasKids?(isCol?'▸':'▾'):'·';
+    let html=`<div class="node${active}" draggable="true" data-gid="${g.id}" style="margin-left:${depth*8}px"><span class="tree-toggle" data-toggle="${g.id}">${toggleSymbol}</span> <b>${g.name}</b> <small style="color:var(--muted)">(${store.getState().devices.filter(d=>d.groupIds.includes(g.id)).length})</small></div>`;
+    if(hasKids && !isCol) html+=`<div class="children">${kids.map(k=>renderNode(k,depth+1)).join('')}</div>`;
     return html;
   }
   $('#groupTree').innerHTML=roots.map(r=>renderNode(r)).join('');
@@ -528,29 +640,70 @@ function renderGroups(){
 function renderDrawer(id, preserveScroll=false){
   const d=store.getState().deviceMap.get(id); if(!d) return;
   const body=$('#drawerBody'); const scrollTop=preserveScroll?body.scrollTop:0;
-  body.innerHTML=`<div class="kv"><b>ID</b><span>${d.id}</span><b>名称</b><span>${d.name}</span><b>区域</b><span>${d.region} / ${d.city}</span><b>状态</b><span><span class="status ${d.status}">${d.status}</span></span><b>网络</b><span>${d.network}</span><b>版本</b><span>${d.version} · seq ${d._seq}</span><b>更新</b><span>${new Date(d.lastUpdate).toLocaleString()}</span></div>
-  <div class="grid2"><div class="pill">CPU <b>${d.cpu}%</b></div><div class="pill">内存 <b>${d.memory}%</b></div><div class="pill">温度 <b>${fmt(d.temperature)}°C</b></div><div class="pill">功率 <b>${fmt(d.power)}W</b></div><div class="pill">电压 <b>${d.voltage}V</b></div><div class="pill">电流 <b>${d.current}A</b></div><div class="pill">延迟 <b>${d.latency}ms</b></div><div class="pill">电量 <b>${d.battery}%</b></div></div>
+  const isSameDev = body.querySelector('#dwDevId')?.dataset?.id === d.id;
+  if(preserveScroll && isSameDev){
+    updateDrawerMetrics(d);
+    return;
+  }
+  buildDrawer(d);
+  if(preserveScroll) body.scrollTop=scrollTop;
+}
+function buildDrawer(d){
+  const body=$('#drawerBody');
+  body.innerHTML=`<div class="kv"><b>ID</b><span id="dwDevId" data-id="${d.id}">${d.id}</span><b>名称</b><span id="dwName">${d.name}</span><b>区域</b><span>${d.region} / ${d.city}</span><b>状态</b><span id="dwStatus"><span class="status ${d.status}">${d.status}</span></span><b>网络</b><span>${d.network}</span><b>版本</b><span id="dwVersion">${d.version} · seq ${d._seq}</span><b>更新</b><span id="dwLastUpdate">${new Date(d.lastUpdate).toLocaleString()}</span></div>
+  <div class="grid2"><div class="pill">CPU <b id="dwCpu">${d.cpu}%</b></div><div class="pill">内存 <b>${d.memory}%</b></div><div class="pill">温度 <b id="dwTemp">${fmt(d.temperature)}°C</b></div><div class="pill">功率 <b id="dwPower">${fmt(d.power)}W</b></div><div class="pill">电压 <b>${d.voltage}V</b></div><div class="pill">电流 <b>${d.current}A</b></div><div class="pill">延迟 <b id="dwLat">${d.latency}ms</b></div><div class="pill">电量 <b>${d.battery}%</b></div></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" id="btnMoveToMaint">移至维护组 (乐观更新)</button><button class="btn small" id="btnAddTagToDev">添加标签</button><button class="btn small" id="btnDelDev">删除设备</button><button class="btn small" id="btnFetchDetail">模拟 fetchDetail (竞态)</button></div>
   <div id="fetchState" style="font-size:12px;color:var(--muted)"></div>
-  <div class="charts"><div class="chart-wrap"><b style="font-size:12px">CPU</b><canvas id="cCpu"></canvas></div><div class="chart-wrap"><b style="font-size:12px">温度</b><canvas id="cTemp"></canvas></div><div class="chart-wrap"><b style="font-size:12px">功率</b><canvas id="cPower"></canvas></div><div class="chart-wrap"><b style="font-size:12px">延迟</b><canvas id="cLat"></canvas></div></div>
-  <div><b style="font-size:12px">历史告警</b><div style="font-size:12px;color:var(--muted)">${store.getState().alarms.filter(a=>a.deviceId===d.id).slice(0,5).map(a=>`· ${a.type} ${a.level} ${new Date(a.timestamp).toLocaleTimeString()}`).join('<br>')||'无'}</div></div>
+  <div class="charts"><div class="chart-wrap"><b style="font-size:12px">CPU</b><canvas id="cCpu"></canvas><div class="chart-tooltip" id="tipCpu"></div></div><div class="chart-wrap"><b style="font-size:12px">温度</b><canvas id="cTemp"></canvas><div class="chart-tooltip" id="tipTemp"></div></div><div class="chart-wrap"><b style="font-size:12px">功率</b><canvas id="cPower"></canvas><div class="chart-tooltip" id="tipPower"></div></div><div class="chart-wrap"><b style="font-size:12px">延迟</b><canvas id="cLat"></canvas><div class="chart-tooltip" id="tipLat"></div></div></div>
+  <div><b style="font-size:12px">历史告警</b><div id="dwAlarmList" style="font-size:12px;color:var(--muted)">${store.getState().alarms.filter(a=>a.deviceId===d.id).slice(0,5).map(a=>`· ${a.type} ${a.level} ${new Date(a.timestamp).toLocaleTimeString()}`).join('<br>')||'无'}</div></div>
   `;
-  if(preserveScroll) body.scrollTop=scrollTop;
-  // charts
-  drawChart('cCpu', d.history.map(h=>h.cpu), '#2563eb');
-  drawChart('cTemp', d.history.map(h=>h.temp), '#ef4444');
-  drawChart('cPower', d.history.map(h=>h.power), '#f59e0b');
-  drawChart('cLat', d.history.map(h=>h.lat), '#10b981');
   $('#btnMoveToMaint').onclick=()=>optimisticMove(d.id);
-  $('#btnAddTagToDev').onclick=()=>{const t=prompt('标签名'); if(t){ const cmd={execute(){d.tags=[...new Set([...d.tags,t])]; store.setState({}); recompute(); renderDrawer(id,true)}, undo(){d.tags=d.tags.filter(x=>x!==t); store.setState({}); recompute();}}; history.push(cmd); storage.debouncedSet('devices_patch',1)} };
+  $('#btnAddTagToDev').onclick=()=>{const t=prompt('标签名'); if(t){ const cmd={execute(){d.tags=[...new Set([...d.tags,t])]; store.setState({}); recompute(); renderDrawer(d.id,true)}, undo(){d.tags=d.tags.filter(x=>x!==t); store.setState({}); recompute();}}; history.push(cmd); storage.debouncedSet('devices_patch',1)} };
   $('#btnDelDev').onclick=()=>deleteDevice(d.id);
   let reqId=0; let abort=null;
   $('#btnFetchDetail').onclick=()=>{
     if(abort) abort.abort();
     abort=new AbortController(); const myId=++reqId; $('#fetchState').textContent='加载中... (延迟 100~3000ms)';
-    fetchDeviceDetail(d.id, abort.signal).then(res=>{ if(myId!==reqId) return; if(abort.signal.aborted) return; $('#fetchState').textContent=`详情: ${JSON.stringify(res).slice(0,120)}...`; logger.info('Detail','fetched',{id:d.id})}).catch(e=>{ $('#fetchState').textContent='已取消或失败: '+e.message});
+    fetchDeviceDetail(d.id, abort.signal).then(res=>{ if(myId!==reqId || abort.signal.aborted) return; $('#fetchState').textContent=`详情: ${JSON.stringify(res).slice(0,120)}...`; logger.info('Detail','fetched',{id:d.id})}).catch(e=>{ $('#fetchState').textContent='已取消或失败: '+e.message});
   };
-  attachCanvasTooltip();
+  initCanvasTooltips();
+  updateDrawerCharts(d);
+}
+function updateDrawerMetrics(d){
+  const elCpu=$('#dwCpu'), elTemp=$('#dwTemp'), elPower=$('#dwPower'), elLat=$('#dwLat'), elBat=$('#dwBat');
+  if(elCpu) elCpu.textContent=d.cpu+'%';
+  if(elTemp) elTemp.textContent=fmt(d.temperature)+'°C';
+  if(elPower) elPower.textContent=fmt(d.power)+'W';
+  if(elLat) elLat.textContent=d.latency+'ms';
+  if(elBat) elBat.textContent=d.battery+'%';
+  const elStatus=$('#dwStatus'); if(elStatus) elStatus.innerHTML=`<span class="status ${d.status}">${d.status}</span>`;
+  const elVer=$('#dwVersion'); if(elVer) elVer.textContent=`${d.version} · seq ${d._seq}`;
+  const elUpdate=$('#dwLastUpdate'); if(elUpdate) elUpdate.textContent=new Date(d.lastUpdate).toLocaleString();
+  updateDrawerCharts(d);
+}
+function updateDrawerCharts(d){
+  drawChart('cCpu', d.history.map(h=>h.cpu), '#2563eb');
+  drawChart('cTemp', d.history.map(h=>h.temp), '#ef4444');
+  drawChart('cPower', d.history.map(h=>h.power), '#f59e0b');
+  drawChart('cLat', d.history.map(h=>h.lat), '#10b981');
+}
+function initCanvasTooltips(){
+  const charts=[{c:'cCpu',t:'tipCpu',u:'%'},{c:'cTemp',t:'tipTemp',u:'°C'},{c:'cPower',t:'tipPower',u:'W'},{c:'cLat',t:'tipLat',u:'ms'}];
+  charts.forEach(({c,t,u})=>{
+    const cv=document.getElementById(c), tip=document.getElementById(t);
+    if(!cv||!tip) return;
+    cv.onmousemove=(e)=>{
+      const rect=cv.getBoundingClientRect(); const x=e.clientX-rect.left; const data=cv._data||[];
+      if(!data.length) return;
+      const idx=Math.round((x-12)/(rect.width-24)*(data.length-1));
+      const v=data[clamp(idx,0,data.length-1)];
+      tip.style.display='block';
+      tip.style.left=clamp(x+10, 8, rect.width-70)+'px';
+      tip.style.top='10px';
+      tip.textContent=`${fmt(v)}${u}`;
+    };
+    cv.onmouseleave=()=>{ tip.style.display='none'; };
+  });
 }
 let currentDrawerId=null;
 function openDrawer(id){ currentDrawerId=id; $('#drawer').classList.add('open'); renderDrawer(id); bus.emit('device:selected',id); storage.debouncedSet('selectedDevice',id)}
@@ -569,15 +722,7 @@ function drawChart(canvasId, data, color){
   ctx.fillStyle=color; data.forEach((v,i)=>{const x=pad+(w-pad*2)*i/Math.max(1,data.length-1); const y=pad+(h-pad*2)*(1-(v-min)/range); ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill()});
   c._data=data; c._min=min; c._max=max;
 }
-function attachCanvasTooltip(){
-  $$('canvas').forEach(c=>{
-    const tip=document.createElement('div'); tip.style.cssText='position:absolute;background:#0f172a;color:#fff;padding:4px 6px;border-radius:6px;font-size:11px;pointer-events:none;display:none;z-index:10';
-    c.parentElement.style.position='relative'; c.parentElement.appendChild(tip);
-    c.onmousemove=(e)=>{const rect=c.getBoundingClientRect(); const x=e.clientX-rect.left; const data=c._data||[]; if(!data.length) return; const idx=Math.round((x-12)/(rect.width-24)*(data.length-1)); const v=data[clamp(idx,0,data.length-1)]; tip.style.display='block'; tip.style.left=(x+8)+'px'; tip.style.top='10px'; tip.textContent=`值: ${v} idx:${idx}`};
-    c.onmouseleave=()=>tip.style.display='none';
-  });
-}
-const ro=new ResizeObserver(()=>{ if(currentDrawerId) renderDrawer(currentDrawerId,true)}); ro.observe($('#drawerBody'));
+const ro=new ResizeObserver(()=>{ if(currentDrawerId){ const d=store.getState().deviceMap.get(currentDrawerId); if(d) updateDrawerCharts(d); } }); ro.observe($('#drawerBody'));
 
 /* ========== fetchDeviceDetail with race control ========== */
 function fetchDeviceDetail(id, signal){
@@ -623,6 +768,17 @@ function updateBatchUI(){
 }
 function runBatch(type){
   const ids=[...store.getState().selection]; if(!ids.length) return toast('请先选择设备');
+  let batchTag = null;
+  let batchGroup = null;
+  if(type === 'tag'){
+    batchTag = prompt('请输入要批量添加的标签名称：', '批量运维');
+    if(batchTag === null) return toast('已取消批量打标签');
+    batchTag = batchTag.trim() || '批量';
+  } else if(type === 'move'){
+    batchGroup = prompt('请输入目标分组ID（如 g_sh / g_sz / g_maint）：', 'g_maint');
+    if(batchGroup === null) return toast('已取消批量移动分组');
+    batchGroup = batchGroup.trim() || 'g_maint';
+  }
   const count=Math.min(ids.length, 1200); // cap for demo; if 50000 selected would freeze
   const targets=ids.slice(0,count); batchTasks=[]; taskQueue.cancel();
   for(const id of targets){
@@ -633,8 +789,8 @@ function runBatch(type){
         const d=store.getState().deviceMap.get(id); if(!d) return rej(new Error('gone'));
         if(type==='reboot'){ d.status='online'; d.cpu=10+Math.floor(Math.random()*30); }
         if(type==='maintenance'){ d.status='maintenance'; if(!d.groupIds.includes('g_maint')) d.groupIds.push('g_maint'); }
-        if(type==='tag'){ const tag=prompt('批量标签名 (取消则跳过)')||'批量'; if(tag) d.tags=[...new Set([...d.tags,tag])]; }
-        if(type==='move'){ const gid=prompt('目标分组ID 如 g_sh / g_sz (取消跳过)')||'g_sh'; if(gid) d.groupIds=[...new Set([...d.groupIds,gid])]; }
+        if(type==='tag'){ d.tags=[...new Set([...d.tags,batchTag])]; }
+        if(type==='move'){ d.groupIds=[...new Set([...d.groupIds,batchGroup])]; }
         if(type==='ack'){ store.getState().alarms.forEach(a=>{ if(a.deviceId===id) a.acknowledged=true}); }
         enqueueUpdate(d); res();
       },delay);
@@ -642,7 +798,7 @@ function runBatch(type){
     batchTasks.push(t); taskQueue.add(t);
   }
   taskQueue.start(); updateBatchUI();
-  bus.on('task:progress',updateBatchUI); bus.on('task:completed',()=>{ recompute(); renderAlarms(); updateBatchUI(); toast('批量完成'); logger.info('Batch',type,{total})});
+  bus.on('task:progress',updateBatchUI); bus.on('task:completed',()=>{ recompute(); renderAlarms(); updateBatchUI(); toast('批量完成'); logger.info('Batch',type,{total:targets.length})});
   // optimistic history entry
   const snapTargets=targets.map(id=>{const d=store.getState().deviceMap.get(id); return {id,groupIds:[...d.groupIds],status:d.status,tags:[...d.tags]}});
   history.push({execute(){},undo(){ snapTargets.forEach(s=>{const d=store.getState().deviceMap.get(s.id); if(d){d.groupIds=s.groupIds; d.status=s.status; d.tags=s.tags}}); recompute();}});
@@ -681,7 +837,23 @@ $('#btnInvert').onclick=()=>{ const sel=new Set(); filteredSorted.forEach(d=>{ i
   store.setState({selection:sel}); updateSelectInfo(); vlist.render();}
 $('#btnClearSel').onclick=()=>{store.setState({selection:new Set()}); updateSelectInfo(); vlist.render();}
 $('#groupTree').onclick=(e)=>{
-  const node=e.target.closest('.node'); if(!node) return; const gid=node.dataset.gid; store.setState({selectedGroup:gid}); renderGroups(); recompute(); storage.debouncedSet('selectedGroup',gid);
+  const toggle=e.target.closest('[data-toggle]');
+  if(toggle){
+    e.stopPropagation();
+    const gid=toggle.dataset.toggle;
+    const collapsed=store.getState().collapsedGroups||new Set();
+    if(collapsed.has(gid)) collapsed.delete(gid);
+    else collapsed.add(gid);
+    store.setState({collapsedGroups:collapsed});
+    renderGroups();
+    return;
+  }
+  const node=e.target.closest('.node'); if(!node) return;
+  const gid=node.dataset.gid;
+  store.setState({selectedGroup:gid});
+  renderGroups();
+  recompute();
+  storage.debouncedSet('selectedGroup',gid);
 };
 $('#groupTree').addEventListener('dragover',e=>{e.preventDefault(); const n=e.target.closest('.node'); if(n) n.style.outline='2px dashed var(--primary)'});
 $('#groupTree').addEventListener('dragleave',e=>{const n=e.target.closest('.node'); if(n) n.style.outline=''});
@@ -721,10 +893,54 @@ $('#btnAddTag').onclick=()=>{
 };
 $$('[data-batch]').forEach(b=>b.onclick=()=>runBatch(b.dataset.batch));
 $('#btnCancelTask').onclick=()=>{taskQueue.cancel(); batchTasks.forEach(t=>t.status='canceled'); updateBatchUI(); toast('已取消')};
-$('#btnRetryTask').onclick=()=>{const failed=batchTasks.filter(t=>t.status==='failed'); if(!failed.length) return toast('无失败任务'); failed.forEach(t=>{t.status='pending'; taskQueue.add(t)}); taskQueue.start(); toast('已重试')};
+$('#btnRetryTask').onclick=()=>{
+  const failed=batchTasks.filter(t=>t.status==='failed');
+  if(!failed.length) return toast('无失败任务');
+  failed.forEach(t=>{
+    t.status='pending';
+    t.retryCount=0;
+    t.error=null;
+    taskQueue.add(t);
+  });
+  taskQueue.start();
+  toast('已重试失败任务');
+};
 $('#btnAckAll').onclick=()=>{const s=store.getState().alarms; s.forEach(a=>a.acknowledged=true); store.setState({alarms:[...s]}); renderAlarms(); history.push({execute(){},undo(){s.forEach(a=>a.acknowledged=false); renderAlarms()}})};
 $('#btnClearAlarm').onclick=()=>{const s=store.getState().alarms.filter(a=>!a.acknowledged); store.setState({alarms:s}); renderAlarms()};
-$('#alarmList').onclick=(e)=>{const ack=e.target.closest('[data-ack]'); const del=e.target.closest('[data-del]'); if(ack){const id=ack.dataset.ack; const a=store.getState().alarms.find(x=>x.id===id); if(a){const prev=a.acknowledged; history.push({execute(){a.acknowledged=true; renderAlarms()},undo(){a.acknowledged=prev; renderAlarms()}}); a.acknowledged=true; renderAlarms()}} if(del){const id=del.dataset.del; const prev=[...store.getState().alarms]; history.push({execute(){store.setState({alarms:store.getState().alarms.filter(x=>x.id!==id)});renderAlarms()},undo(){store.setState({alarms:prev});renderAlarms()}}); store.setState({alarms:store.getState().alarms.filter(x=>x.id!==id)}); renderAlarms()}};
+$('#alarmList').onclick=(e)=>{
+  const devLink=e.target.closest('[data-dev]');
+  if(devLink){
+    const devId=devLink.dataset.dev;
+    openDrawer(devId);
+    const idx=filteredSorted.findIndex(d=>d.id===devId);
+    if(idx>=0){
+      vlist.scrollToIndex(idx);
+      store.setState({selection:new Set([devId])});
+      updateSelectInfo();
+      vlist.render();
+    }
+    return;
+  }
+  const ack=e.target.closest('[data-ack]');
+  const del=e.target.closest('[data-del]');
+  if(ack){
+    const id=ack.dataset.ack;
+    const a=store.getState().alarms.find(x=>x.id===id);
+    if(a){
+      const prev=a.acknowledged;
+      history.push({execute(){a.acknowledged=true; renderAlarms()},undo(){a.acknowledged=prev; renderAlarms()}});
+      a.acknowledged=true;
+      renderAlarms();
+    }
+  }
+  if(del){
+    const id=del.dataset.del;
+    const prev=[...store.getState().alarms];
+    history.push({execute(){store.setState({alarms:store.getState().alarms.filter(x=>x.id!==id)});renderAlarms()},undo(){store.setState({alarms:prev});renderAlarms()}});
+    store.setState({alarms:store.getState().alarms.filter(x=>x.id!==id)});
+    renderAlarms();
+  }
+};
 $('#alarmLevel').onchange=renderAlarms;
 
 $('#btnPause').onclick=()=>{const paused=!store.getState().ui.paused; store.setState({ui:{...store.getState().ui,paused}}); $('#btnPause').textContent=paused?'恢复实时':'暂停实时'; bus.emit(paused?'connection:lost':'connection:restored'); logger.info('WS',paused?'paused':'resumed',{})};
@@ -780,7 +996,12 @@ $('#btnCloseImport').onclick=()=>$('#importModal').classList.remove('open');
 
 // keyboard
 document.addEventListener('keydown',(e)=>{
-  if(e.key==='/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName!=='INPUT' && document.activeElement.tagName!=='TEXTAREA'){ e.preventDefault(); $('#searchInput').focus(); }
+  if(e.key==='/' && !e.ctrlKey && !e.metaKey){
+    if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+    if($('#cmdModal').classList.contains('open') || $('#importModal').classList.contains('open') || $('#logModal').classList.contains('open')) return;
+    e.preventDefault();
+    $('#searchInput').focus();
+  }
   if(e.key==='Escape'){ closeDrawer(); $('#cmdModal').classList.remove('open'); $('#importModal').classList.remove('open'); $('#logModal').classList.remove('open'); $('#sidebar').classList.remove('open'); }
   if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openCmd(); }
   if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z' && !e.shiftKey){ e.preventDefault(); history.undo(); toast('已撤销'); }
@@ -793,15 +1014,15 @@ document.addEventListener('keydown',(e)=>{
 });
 $('#cmdInput').addEventListener('keydown',(e)=>{
   const list=$('#cmdList'); const items=$$('.cmd-item',list); if(!items.length) return; let idx=list._idx||0;
-  if(e.key==='ArrowDown'){ idx=Math.min(idx+1,items.length-1); list._idx=idx; items.forEach((el,i)=>el.classList.toggle('active',i===idx)); e.preventDefault()}
-  if(e.key==='ArrowUp'){ idx=Math.max(idx-1,0); list._idx=idx; items.forEach((el,i)=>el.classList.toggle('active',i===idx)); e.preventDefault()}
+  if(e.key==='ArrowDown'){ idx=Math.min(idx+1,items.length-1); list._idx=idx; items.forEach((el,i)=>el.classList.toggle('active',i===idx)); items[idx]?.scrollIntoView({block:'nearest'}); e.preventDefault()}
+  if(e.key==='ArrowUp'){ idx=Math.max(idx-1,0); list._idx=idx; items.forEach((el,i)=>el.classList.toggle('active',i===idx)); items[idx]?.scrollIntoView({block:'nearest'}); e.preventDefault()}
   if(e.key==='Enter'){ const el=items[idx]; if(el){ const c=commands.find(x=>x.id===el.dataset.id); $('#cmdModal').classList.remove('open'); c.run(); } }
 });
 
 $('#btnUndo').onclick=()=>{history.undo(); toast('已撤销')};
 $('#btnRedo').onclick=()=>{history.redo(); toast('已重做')};
 $('#btnScrollTop').onclick=()=>vlist.scrollToIndex(0);
-$('#btnScrollMid').onclick=()=>vlist.scrollToIndex(40000);
+$('#btnScrollMid').onclick=()=>vlist.scrollToIndex(Math.min(40000, Math.floor(filteredSorted.length/2)));
 $('#btnMobileGroup').onclick=()=>$('#sidebar').classList.toggle('open');
 $('#viewport').setAttribute('tabindex','0');
 $('#list-card')?.addEventListener?.('click',()=>{});
