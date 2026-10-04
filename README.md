@@ -15,6 +15,7 @@
 | 一级目录 (英文) | 一句话简介 | 原目录/模型来源 | 技术栈 |
 |---|---|---|---|
 | [`block-game`](./block-game/) | **3D 方块沙盒游戏**（网页版 Minecraft） | `eGLM` | 纯 WebGL 1.0 + 原生模块化 JS |
+| [`cyber-potato`](./cyber-potato/) | **赛博电子土豆**（会吐槽/会过载/会写辞职信的像素宠物） | 原创趣味互动 | 纯 HTML5 + CSS3 动画 + Web Audio + localStorage |
 | [`internet-museum`](./internet-museum/) | **互联网考古馆**（穿越 1998~2099 数字文明沉浸展） | 原创沉浸交互 | 纯 HTML5 + CSS3 + 原生 JS + Web Audio |
 | [`learn-lang`](./learn-lang/) | **多语种语言学习应用**（3D 闪卡 + 单词发音） | `aWebsite` | 纯 HTML5 + CSS3 + 原生 JS |
 | [`iot-hub`](./iot-hub/) | **物联网设备监控面板**（万级数据虚拟滚动） | `bOpencodeXAlpha` | 单文件纯 HTML + CSS + JS |
@@ -31,6 +32,7 @@
    python3 -m http.server 8080
    ```
    - [http://localhost:8080/block-game/](http://localhost:8080/block-game/)
+   - [http://localhost:8080/cyber-potato/](http://localhost:8080/cyber-potato/)
    - [http://localhost:8080/internet-museum/](http://localhost:8080/internet-museum/)
    - [http://localhost:8080/learn-lang/](http://localhost:8080/learn-lang/)
    - [http://localhost:8080/iot-hub/](http://localhost:8080/iot-hub/)
