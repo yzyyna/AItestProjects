@@ -9,18 +9,31 @@
       gl.shaderSource(s, src);
       gl.compileShader(s);
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        throw new Error('Shader 编译失败: ' + gl.getShaderInfoLog(s));
+        var err = gl.getShaderInfoLog(s);
+        gl.deleteShader(s);
+        throw new Error('Shader 编译失败: ' + err);
       }
       return s;
     }
-    var p = gl.createProgram();
-    gl.attachShader(p, sh(gl.VERTEX_SHADER, vsSrc));
-    gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fsSrc));
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-      throw new Error('Program 链接失败: ' + gl.getProgramInfoLog(p));
+    var vs = null, fs = null, p = null;
+    try {
+      vs = sh(gl.VERTEX_SHADER, vsSrc);
+      fs = sh(gl.FRAGMENT_SHADER, fsSrc);
+      p = gl.createProgram();
+      gl.attachShader(p, vs);
+      gl.attachShader(p, fs);
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+        var err2 = gl.getProgramInfoLog(p);
+        throw new Error('Program 链接失败: ' + err2);
+      }
+      return p;
+    } catch (e) {
+      if (vs) gl.deleteShader(vs);
+      if (fs) gl.deleteShader(fs);
+      if (p) gl.deleteProgram(p);
+      throw e;
     }
-    return p;
   }
 
   /* ---------- 着色器 ---------- */
@@ -253,6 +266,20 @@
     }
   };
 
+  Renderer.prototype.dispose = function () {
+    var gl = this.gl;
+    if (this.progChunk) gl.deleteProgram(this.progChunk);
+    if (this.progFlat) gl.deleteProgram(this.progFlat);
+    if (this.progPoint) gl.deleteProgram(this.progPoint);
+    if (this.tex) gl.deleteTexture(this.tex);
+    if (this.lineBuf) gl.deleteBuffer(this.lineBuf);
+    if (this.pointBuf) gl.deleteBuffer(this.pointBuf);
+    if (this.skyQuadBuf) gl.deleteBuffer(this.skyQuadBuf);
+    if (this.starBuf) gl.deleteBuffer(this.starBuf);
+    if (this.cloudBuf) gl.deleteBuffer(this.cloudBuf);
+    if (this.tntBoxBuf) gl.deleteBuffer(this.tntBoxBuf);
+  };
+
   Renderer.prototype._bindChunkAttribs = function (vbo) {
     var gl = this.gl, L = this.locChunk;
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
@@ -342,6 +369,7 @@
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.depthMask(false);
+    gl.disable(gl.CULL_FACE); /* 临时关闭面剔除，使水下仰视水面双面可见 */
     for (i = opts.chunks.length - 1; i >= 0; i--) {
       ch = opts.chunks[i];
       if (!ch.mesh || ch.mesh.nT === 0) continue;
@@ -349,6 +377,7 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ch.mesh.iboT);
       gl.drawElements(gl.TRIANGLES, ch.mesh.nT, ch.mesh.idxTypeT, 0);
     }
+    gl.enable(gl.CULL_FACE);
 
     /* --- 粒子 --- */
     if (opts.particleData && opts.particleCount > 0) {
@@ -640,8 +669,6 @@
       var col = flash ? [1.0, 1.0, 1.0, 1.0] : [0.85, 0.22, 0.15, 1.0];
       gl.uniform4f(this.locFlat.uColor, col[0], col[1], col[2], col[3]);
 
-      /* 根据位置构造局部变换矩阵并绘制 */
-      var m = new Float32Array(this.view);
       /* 借助 translate 平移 view 矩阵绘制单个方块 */
       var trView = this._translateView(this.view, tnt.x, tnt.y + 0.45, tnt.z);
       gl.uniformMatrix4fv(this.locFlat.uView, false, trView);

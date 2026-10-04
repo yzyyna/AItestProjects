@@ -174,6 +174,8 @@
     var ch = this.ensureData(cx, cz);
     var lx = x & 15, lz = z & 15;
     var idx = (y * CHUNK + lz) * CHUNK + lx;
+    var oldId = ch.data[idx];
+    if (oldId === id) return true;
     ch.data[idx] = id;
 
     /* 记录编辑，供存档与重新生成 */
@@ -181,6 +183,11 @@
     var m = this.edits.get(k);
     if (!m) { m = new Map(); this.edits.set(k, m); }
     m.set(idx, id);
+
+    /* 检查是否涉及光源方块（火把/萤石等） */
+    var oldDef = MC.DEFS[oldId];
+    var newDef = MC.DEFS[id];
+    var isLightChange = (oldDef && oldDef.light) || (newDef && newDef.light);
 
     /* 标记需要重建网格（含边角相邻区块，因为面剔除与 AO 跨界） */
     this.dirtySet.add(k);
@@ -190,11 +197,16 @@
         if (i === 0 && j === 0) continue;
         var needX = (lx === 0 && i === -1) || (lx === 15 && i === 1) || i === 0;
         var needZ = (lz === 0 && j === -1) || (lz === 15 && j === 1) || j === 0;
-        if (needX && needZ) this.dirtySet.add(this.key(cx + i, cz + j));
+        /* 光源方块具有 8 格衰减辐射，因此必须将周围 8 个邻近区块均标记 dirty */
+        if (isLightChange || (needX && needZ)) {
+          this.dirtySet.add(this.key(cx + i, cz + j));
+        }
       }
     }
-    /* 火把/萤石等光源变化会影响邻近区块的亮度 */
-    this._lightDirty = true;
+    /* 仅当增删光源方块时才使光源缓存失效，避免常规挖掘引发全图遍历 */
+    if (isLightChange) {
+      this._lightDirty = true;
+    }
     return true;
   };
 
@@ -242,12 +254,16 @@
   };
 
   World.prototype.loadEdits = function (obj) {
-    if (!obj) return;
+    if (!obj || typeof obj !== 'object') return;
     var self = this;
     Object.keys(obj).forEach(function (k) {
-      var m = new Map();
       var o = obj[k];
-      Object.keys(o).forEach(function (idx) { m.set(+idx, o[idx]); });
+      if (!o || typeof o !== 'object') return;
+      var m = new Map();
+      Object.keys(o).forEach(function (idx) {
+        var id = o[idx];
+        if (typeof id === 'number') m.set(+idx, id);
+      });
       self.edits.set(k, m);
     });
   };

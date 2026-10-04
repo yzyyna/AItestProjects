@@ -100,11 +100,36 @@
     var steps = Math.max(1, Math.ceil(maxComp / 0.35));
     if (steps > 10) steps = 10;
     var i, s;
+    var wasOnGround = this.onGround;
     this.onGround = false;
     this.hitWall = false;
     for (s = 0; s < steps; s++) {
-      for (i = 0; i < 3; i++) {
-        this._moveAxis(i, move[i] / steps);
+      /* 先处理垂直轴 Y，确保着地状态确立后再处理水平轴 */
+      this._moveAxis(1, move[1] / steps, wasOnGround);
+      this._moveAxis(0, move[0] / steps, wasOnGround);
+      this._moveAxis(2, move[2] / steps, wasOnGround);
+    }
+
+    /* 主动脱困：若玩家初始陷入实体方块，平滑搜索最近开阔空间脱出 */
+    if (this._isColliding(this.pos[0], this.pos[1], this.pos[2])) {
+      var escaped = false;
+      for (var up = 0.5; up <= 3.0; up += 0.5) {
+        if (!this._isColliding(this.pos[0], this.pos[1] + up, this.pos[2])) {
+          this.pos[1] += up;
+          this.vel[1] = 0;
+          escaped = true;
+          break;
+        }
+      }
+      if (!escaped) {
+        var offsets = [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]];
+        for (var o = 0; o < offsets.length; o++) {
+          if (!this._isColliding(this.pos[0] + offsets[o][0], this.pos[1], this.pos[2] + offsets[o][1])) {
+            this.pos[0] += offsets[o][0];
+            this.pos[2] += offsets[o][1];
+            break;
+          }
+        }
       }
     }
 
@@ -149,7 +174,7 @@
     return false;
   };
 
-  Player.prototype._moveAxis = function (axis, amount) {
+  Player.prototype._moveAxis = function (axis, amount, wasOnGround) {
     if (amount === 0) return;
     var pos = this.pos;
 
@@ -193,7 +218,8 @@
     }
 
     /* 2. 碰壁！如果处于地面或水边攀爬，尝试平滑跨越（Auto Step-Up 0.6~1.05m 高度） */
-    if ((this.onGround || (this.waterClimb && this.waterClimb > 0)) && !this.flying) {
+    var canStep = (this.onGround || wasOnGround || (this.waterClimb && this.waterClimb > 0)) && !this.flying;
+    if (canStep) {
       var stepH = 1.02;
       /* 验证头顶空间无遮挡 */
       if (!this._isColliding(oldX, oldY + stepH, oldZ)) {
@@ -208,12 +234,13 @@
           pos[1] = finalY;
           pos[2] = targetZ;
           this.onGround = true;
+          this.vel[1] = Math.max(0, this.vel[1]);
           return;
         }
       }
     }
 
-    /* 3. 确实撞上高墙，贴合边缘停靠，允许沿墙滑动 */
+    /* 3. 确实撞上高墙，精准计算最近碰撞面，贴合边缘停靠，彻底防止穿墙与坐标覆盖 */
     pos[axis] += amount;
     var minX2 = pos[0] - HALF_W, minY2 = pos[1], minZ2 = pos[2] - HALF_W;
     var maxX2 = pos[0] + HALF_W, maxY2 = pos[1] + HEIGHT, maxZ2 = pos[2] + HALF_W;
@@ -221,21 +248,35 @@
     var y02 = Math.floor(minY2), y12 = Math.ceil(maxY2) - 1;
     var z02 = Math.floor(minZ2), z12 = Math.ceil(maxZ2) - 1;
     var x2, y2, z2;
+    var collideMin = Infinity;
+    var collideMax = -Infinity;
+    var hit = false;
+
     for (y2 = y02; y2 <= y12; y2++) {
       for (z2 = z02; z2 <= z12; z2++) {
         for (x2 = x02; x2 <= x12; x2++) {
           if (!MC.isSolid(this.world.getBlock(x2, y2, z2))) continue;
+          hit = true;
           if (axis === 0) {
-            pos[0] = amount > 0 ? x2 - HALF_W - EPS : x2 + 1 + HALF_W + EPS;
-            this.vel[0] = 0;
-            this.hitWall = true;
+            if (x2 < collideMin) collideMin = x2;
+            if (x2 > collideMax) collideMax = x2;
           } else {
-            pos[2] = amount > 0 ? z2 - HALF_W - EPS : z2 + 1 + HALF_W + EPS;
-            this.vel[2] = 0;
-            this.hitWall = true;
+            if (z2 < collideMin) collideMin = z2;
+            if (z2 > collideMax) collideMax = z2;
           }
         }
       }
+    }
+
+    if (hit) {
+      if (axis === 0) {
+        pos[0] = amount > 0 ? collideMin - HALF_W - EPS : collideMax + 1 + HALF_W + EPS;
+        this.vel[0] = 0;
+      } else {
+        pos[2] = amount > 0 ? collideMin - HALF_W - EPS : collideMax + 1 + HALF_W + EPS;
+        this.vel[2] = 0;
+      }
+      this.hitWall = true;
     }
   };
 

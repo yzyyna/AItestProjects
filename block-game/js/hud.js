@@ -96,6 +96,17 @@
       html += '<div class="hb-slot" data-i="' + i + '"><span class="keynum">' + (i + 1) + '</span><span class="cnt"></span></div>';
     }
     this.el.hotbar.innerHTML = html;
+    var self = this;
+    this.el.hotbar.addEventListener('click', function (e) {
+      var slot = e.target.closest('.hb-slot');
+      if (!slot) return;
+      var idx = +slot.dataset.i;
+      if (idx >= 0 && idx < MC.Inventory.HOTBAR) {
+        inventory.selected = idx;
+        inventory._emit();
+        if (MC.Sound && MC.Sound.ui) MC.Sound.ui();
+      }
+    });
     this.refreshHotbar(inventory);
   };
 
@@ -195,6 +206,7 @@
       var old = div.querySelector('canvas');
       if (old) old.remove();
       div.classList.toggle('selected', idx === inventory.selected);
+      div.classList.toggle('picked', idx === inventory.pickedSlot);
       if (item) {
         div.appendChild(this.iconFor(item.id));
         div.querySelector('.cnt').textContent = item.count > 1 ? item.count : '';

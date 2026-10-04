@@ -27,7 +27,7 @@
   var stats = { mined: 0, placed: 0 };
   var welcomed = false;
   var airOxygen = 10;
-  var visScanTimer = 0, lastVisX = -99999, lastVisZ = -99999, cachedVisible = null;
+  var visScanTimer = 0, lastVisX = -99999, lastVisZ = -99999, lastVisYaw = -99999, cachedVisible = null;
 
   /* ---------------- 初始化 ---------------- */
   function boot() {
@@ -102,11 +102,22 @@
       MC.Sound.ui();
     };
     hud.onCraftClick = function (recipe) {
+      var haveMaterials = true;
+      for (var i = 0; i < recipe.cost.length; i++) {
+        if (inventory.countItem(recipe.cost[i][0]) < recipe.cost[i][1]) {
+          haveMaterials = false;
+          break;
+        }
+      }
+      if (!haveMaterials) {
+        hud.toast('材料不足');
+        return;
+      }
       if (inventory.craft(recipe)) {
         MC.Sound.craft();
         hud.toast('制作成功: ' + recipe.name);
       } else {
-        hud.toast('材料不足');
+        hud.toast('⚠️ 背包已满，无多余空间');
       }
     };
     inventory.onChange = function () {
@@ -304,7 +315,7 @@
 
   /* ---------------- 存档 ---------------- */
   function doSave() {
-    if (!world) return;
+    if (!world) return false;
     var ok = MC.saveAPI.save({
       seed: world.seed,
       edits: world.serializeEdits(),
@@ -315,7 +326,11 @@
       settings: settings,
       stats: stats
     });
-    savedExists = true;
+    if (ok) {
+      savedExists = true;
+    } else {
+      if (hud && hud.toast) hud.toast('⚠️ 本地存储空间不足，自动存档失败');
+    }
     return ok;
   }
 
@@ -749,11 +764,14 @@
     var R = settings.renderDist;
     var ccx = Math.floor(eye[0] / MC.CHUNK), ccz = Math.floor(eye[2] / MC.CHUNK);
     visScanTimer += dt;
+    var curYaw = (state === 'title' ? 0 : player.yaw);
+    var turnedVis = Math.abs(curYaw - lastVisYaw) > 0.15;
     var movedVis = Math.hypot(eye[0] - lastVisX, eye[2] - lastVisZ) > 1.8;
-    if (movedVis || visScanTimer > 0.08 || world.dirtySet.size > 0 || !cachedVisible) {
+    if (movedVis || turnedVis || visScanTimer > 0.08 || world.dirtySet.size > 0 || !cachedVisible) {
       visScanTimer = 0;
       lastVisX = eye[0];
       lastVisZ = eye[2];
+      lastVisYaw = curYaw;
       cachedVisible = [];
       world.chunks.forEach(function (c) {
         if (!c.mesh) return;
