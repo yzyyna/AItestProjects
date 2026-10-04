@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  // === 状态管理 ===
+  // === 状态管理 (state.js) ===
   /**
  * 《404 之前：互联网考古馆》- 全局状态管理
  * 负责状态存储、localStorage 读写与事件广播
@@ -224,7 +224,7 @@ class MuseumStore {
 const museumStore = new MuseumStore();
 
 
-  // === 音频合成 ===
+  // === 音频合成 (audio.js) ===
   /**
  * 《404 之前：互联网考古馆》- 原生 Web Audio API 声音合成模块
  * 零外部音频依赖，完全由振荡器与白噪合成器纯代码生成
@@ -565,6 +565,29 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 0.2);
   }
 
+  // 2099 碎片错位弹回错误音
+  playReject() {
+    if (!this.isSoundEnabled()) return;
+    this.ensureContext();
+    if (!this.ctx) return;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(140, this.ctx.currentTime + 0.18);
+
+    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.18);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.18);
+  }
+
   // 2099 终极遗迹修复成功大和弦
   playRestorationSuccess() {
     if (!this.isSoundEnabled()) return;
@@ -625,7 +648,7 @@ class AudioManager {
 const audioManager = new AudioManager();
 
 
-  // === 导航驱动 ===
+  // === 导航驱动 (navigation.js) ===
   /**
  * 《404 之前：互联网考古馆》- 导航与时间轴驱动模块
  * 负责横向展区滚动、手势拖拽、键盘导航与时代同步
@@ -678,21 +701,37 @@ class NavigationManager {
       }, 60);
     }, { passive: true });
 
-    // 2. 滚轮事件优化：垂直滚轮在展区内平滑转换为横向滚动
+    // 2. 滚轮事件优化：精准判定纵向滚动意图，避免阻碍展厅内容垂直阅读
     this.galleryEl.addEventListener('wheel', (e) => {
-      // 若处于需要纵向滚动的子面板中（如论坛回帖列表或算法卡片流），不抢夺滚轮
-      const scrollableChild = e.target.closest('.inner-scrollable');
-      if (scrollableChild) {
-        const canScrollVertically = scrollableChild.scrollHeight > scrollableChild.clientHeight;
-        if (canScrollVertically && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-          return; // 允许子容器正常上下滚动
-        }
+      // 若主要是横向滚动（如触控板左右轻扫），直接交由原生处理
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        return;
       }
 
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      // 沿着 DOM 树向上检测当前指针所在的所有可垂直滚动的容器（含内部列表与展厅本身）
+      let targetEl = e.target;
+      while (targetEl && targetEl !== this.galleryEl) {
+        const style = window.getComputedStyle(targetEl);
+        const overflowY = style.overflowY;
+        const isScrollContainer = (overflowY === 'auto' || overflowY === 'scroll') && targetEl.scrollHeight > targetEl.clientHeight;
+
+        if (isScrollContainer) {
+          const canScrollUp = e.deltaY < 0 && targetEl.scrollTop > 0;
+          const canScrollDown = e.deltaY > 0 && (targetEl.scrollTop + targetEl.clientHeight < targetEl.scrollHeight - 1);
+
+          // 若当前容器在其垂直方向上还有滚动空间，优先执行正常的垂直滚动！
+          if (canScrollUp || canScrollDown) {
+            return;
+          }
+        }
+        targetEl = targetEl.parentElement;
+      }
+
+      // 仅在当前垂直空间已到顶/到底，或无需纵向滚动的展区内，才将滚轮转换为横向穿梭
+      if (Math.abs(e.deltaY) > 10) {
         e.preventDefault();
         this.galleryEl.scrollBy({
-          left: e.deltaY * 1.5,
+          left: e.deltaY * 1.3,
           behavior: 'auto'
         });
       }
@@ -876,12 +915,21 @@ class NavigationManager {
 const navigationManager = new NavigationManager();
 
 
-  // === 彩蛋系统 ===
+  // === 彩蛋系统 (eggs.js) ===
   /**
  * 《404 之前：互联网考古馆》- 彩蛋系统与考古发现册
  * 负责彩蛋收集反馈、画册渲染与离线档案导出
  */
 
+
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 class EggsManager {
   constructor() {
@@ -1133,9 +1181,10 @@ class EggsManager {
 
   <h2>📝 您沿途留下的数字印记</h2>
   <div class="meta-box">
-    <p><strong>2003年您提交的留言：</strong> ${state.guestbookMessages[state.guestbookMessages.length - 1]?.text || '风之子路过踩踩'}</p>
-    <p><strong>2012年您发布的个性说说：</strong> ${state.spacePosts[0]?.text || '写在青春空间的未眠心情'}</p>
-    <p><strong>2024年算法对您的画像偏好：</strong> 猫咪喜爱度(${state.algorithmPreference.cat}) / 认知效率(${state.algorithmPreference.productivity}) / 情绪共鸣(${state.algorithmPreference.emotion})</p>
+    <p><strong>2003年您提交的留言：</strong> ${escapeHTML(state.guestbookMessages[0]?.text || '风之子路过踩踩')}</p>
+    <p><strong>2008年您发表的论坛回帖：</strong> ${escapeHTML(state.forumReplies?.[0]?.content || '人在江湖漂，哪能不挨刀')}</p>
+    <p><strong>2012年您发布的个性说说：</strong> ${escapeHTML(state.spacePosts[0]?.text || '写在青春空间的未眠心情')}</p>
+    <p><strong>2024年算法对您的画像偏好：</strong> 猫咪喜爱度(${Number(state.algorithmPreference.cat) || 0}) / 认知效率(${Number(state.algorithmPreference.productivity) || 0}) / 情绪共鸣(${Number(state.algorithmPreference.emotion) || 0})</p>
   </div>
 
   <footer>
@@ -1160,7 +1209,7 @@ class EggsManager {
 const eggsManager = new EggsManager();
 
 
-  // === 1998 拨号接入室 ===
+  // === 1998 拨号接入室 (era-1998.js) ===
   /**
  * 《404 之前：互联网考古馆》- 1998 拨号接入室
  */
@@ -1248,6 +1297,16 @@ function initEra1998() {
     });
   }
 
+  // 绑定图标键盘回车/空格触发无障碍
+  [iconDontClick, iconFloppy, iconCd, iconNetwork].forEach(el => {
+    el?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  });
+
   // 3. 点击彩蛋“不要点.exe”
   if (iconDontClick) {
     iconDontClick.addEventListener('click', () => {
@@ -1300,10 +1359,17 @@ function showWin98Dialog(title, content) {
   if (bodyEl) bodyEl.textContent = content;
 
   modal.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    modal.classList.add('visible');
+  });
   const closeBtn = modal.querySelector('.win98-dialog-close');
   const okBtn = modal.querySelector('.win98-dialog-ok');
   const closer = () => {
-    modal.classList.add('hidden');
+    audioManager.playClick();
+    modal.classList.remove('visible');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+    }, 250);
     closeBtn?.removeEventListener('click', closer);
     okBtn?.removeEventListener('click', closer);
   };
@@ -1312,7 +1378,7 @@ function showWin98Dialog(title, content) {
 }
 
 
-  // === 2003 个人主页花园 ===
+  // === 2003 个人主页花园 (era-2003.js) ===
   /**
  * 《404 之前：互联网考古馆》- 2003 个人主页花园
  */
@@ -1515,7 +1581,7 @@ function escapeHTML(str) {
 }
 
 
-  // === 2008 深夜论坛 ===
+  // === 2008 深夜论坛 (era-2008.js) ===
   /**
  * 《404 之前：互联网考古馆》- 2008 深夜论坛
  */
@@ -1572,6 +1638,24 @@ const MORE_FLOORS = [
   }
 ];
 
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// 安全解析旧论坛 [quote] 和 [b] 标签
+function formatForumContent(rawText) {
+  const safe = escapeHTML(rawText);
+  return safe
+    .replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote class="forum-quote-box">$1</blockquote>')
+    .replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
 function initEra2008() {
   const container = document.getElementById('era-2008');
   if (!container) return;
@@ -1585,7 +1669,6 @@ function initEra2008() {
   const btnSubmitReply = document.getElementById('btn-forum-submit-reply');
   const ghostCounterEl = document.getElementById('forum-ghost-online');
 
-  // 1. 初始化渲染初始楼层
   let currentLoadedExtra = false;
 
   function renderFloorItem(post) {
@@ -1593,18 +1676,18 @@ function initEra2008() {
     floorDiv.className = 'forum-floor-item';
     floorDiv.innerHTML = `
       <div class="floor-sidebar">
-        <div class="user-avatar-badge">${post.avatar}</div>
-        <div class="user-name"><strong>${post.user}</strong></div>
-        <div class="user-rank">${post.rank}</div>
+        <div class="user-avatar-badge">${escapeHTML(post.avatar)}</div>
+        <div class="user-name"><strong>${escapeHTML(post.user)}</strong></div>
+        <div class="user-rank">${escapeHTML(post.rank)}</div>
       </div>
       <div class="floor-main">
         <div class="floor-meta">
-          <span class="floor-tag">${post.floor}</span>
-          <span class="post-time">发表于 ${post.time}</span>
-          <button class="btn-quote-reply" data-floor="${post.floor}" data-user="${post.user}">[引用回复]</button>
+          <span class="floor-tag">${escapeHTML(post.floor)}</span>
+          <span class="post-time">发表于 ${escapeHTML(post.time)}</span>
+          <button class="btn-quote-reply" data-floor="${escapeHTML(post.floor)}" data-user="${escapeHTML(post.user)}">[引用回复]</button>
         </div>
-        <div class="floor-content">${post.content}</div>
-        <div class="floor-signature">${post.signature}</div>
+        <div class="floor-content">${formatForumContent(post.content)}</div>
+        <div class="floor-signature">${escapeHTML(post.signature)}</div>
       </div>
     `;
 
@@ -1613,7 +1696,8 @@ function initEra2008() {
     quoteBtn?.addEventListener('click', () => {
       audioManager.playClick();
       if (replyInput) {
-        replyInput.value = `[quote][b]${post.user}[/b] 在 ${post.floor} 说道：\n${post.content.slice(0, 40)}...[/quote]\n` + replyInput.value;
+        const snippet = String(post.content).slice(0, 50);
+        replyInput.value = `[quote][b]${post.user}[/b] 在 ${post.floor} 说道：\n${snippet}...[/quote]\n` + replyInput.value;
         replyInput.focus();
       }
     });
@@ -1621,10 +1705,15 @@ function initEra2008() {
     return floorDiv;
   }
 
+  // 初始化楼层渲染：初始楼层 + 本地持久化保存的用户回帖
   function initFloors() {
     if (!floorContainer) return;
     floorContainer.innerHTML = '';
     INITIAL_POSTS.forEach(p => floorContainer.appendChild(renderFloorItem(p)));
+
+    // 恢复历史已保存的回复
+    const savedReplies = museumStore.getState().forumReplies || [];
+    savedReplies.forEach(p => floorContainer.appendChild(renderFloorItem(p)));
   }
 
   initFloors();
@@ -1642,7 +1731,7 @@ function initEra2008() {
           MORE_FLOORS.forEach(p => {
             floorContainer.appendChild(renderFloorItem(p));
           });
-          btnLoadMore.textContent = '已展示全部历史楼层';
+          btnLoadMore.textContent = '已展示全部官方历史楼层';
           eggsManager.showToast('📄 已成功加载全部历史楼层讨论！');
         }, 500);
       }
@@ -1697,6 +1786,12 @@ function initEra2008() {
         };
         floorContainer.appendChild(renderFloorItem(userPost));
 
+        // 保存用户回帖到全局持久化状态
+        const existingReplies = museumStore.getState().forumReplies || [];
+        museumStore.update({
+          forumReplies: [...existingReplies, userPost]
+        });
+
         // 随机跟帖
         const randomReplies = [
           '楼主淡定，重装系统试试。',
@@ -1718,6 +1813,13 @@ function initEra2008() {
             signature: '———— 夜太美，尽管太危险，总有人黑着眼眶修仙。'
           };
           floorContainer.appendChild(renderFloorItem(botPost));
+
+          // 将机器人的回帖也一并持久化存储
+          const updatedReplies = museumStore.getState().forumReplies || [];
+          museumStore.update({
+            forumReplies: [...updatedReplies, botPost]
+          });
+
           eggsManager.showToast('💬 回帖成功！收到论坛网友秒回！');
         }, 700);
 
@@ -1752,7 +1854,7 @@ function showFloatingPlusOne(targetEl) {
 }
 
 
-  // === 2012 青春空间 ===
+  // === 2012 青春空间 (era-2012.js) ===
   /**
  * 《404 之前：互联网考古馆》- 2012 青春空间
  */
@@ -1920,7 +2022,7 @@ function escapeHTML(str) {
 }
 
 
-  // === 2024 算法走廊 ===
+  // === 2024 算法走廊 (era-2024.js) ===
   /**
  * 《404 之前：互联网考古馆》- 2024 算法走廊
  */
@@ -2184,16 +2286,24 @@ function showTransparencyModal() {
   const modal = document.getElementById('algorithm-transparency-modal');
   if (!modal) return;
   modal.classList.remove('hidden');
-  const closeBtn = modal.querySelector('.btn-close-transparency');
+  requestAnimationFrame(() => {
+    modal.classList.add('visible');
+  });
+
+  const closeBtns = modal.querySelectorAll('.btn-close-transparency');
   const closer = () => {
-    modal.classList.add('hidden');
-    closeBtn?.removeEventListener('click', closer);
+    audioManager.playClick();
+    modal.classList.remove('visible');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+    }, 250);
+    closeBtns.forEach(btn => btn.removeEventListener('click', closer));
   };
-  closeBtn?.addEventListener('click', closer);
+  closeBtns.forEach(btn => btn.addEventListener('click', closer));
 }
 
 
-  // === 2099 网页遗址修复中心 ===
+  // === 2099 网页遗址修复中心 (era-2099.js) ===
   /**
  * 《404 之前：互联网考古馆》- 2099 网页遗址修复中心
  */
@@ -2257,6 +2367,7 @@ function initEra2099() {
   const btnFinalExport = document.getElementById('btn-final-export-book');
 
   let restoredIds = [...(museumStore.getState().restoredFragments || [])];
+  let selectedFragId = null;
 
   function updateProgressUI() {
     const total = FRAGMENTS_CONFIG.length;
@@ -2290,6 +2401,10 @@ function initEra2099() {
       const slot = document.createElement('div');
       slot.className = `restoration-slot ${isRestored ? 'filled' : 'empty'}`;
       slot.dataset.targetId = cfg.id;
+      slot.setAttribute('tabindex', isRestored ? '-1' : '0');
+      slot.setAttribute('role', 'region');
+      slot.setAttribute('aria-label', `${cfg.era}年代遗迹修复插槽`);
+
       slot.innerHTML = `
         <div class="slot-era-badge">${cfg.era}</div>
         <div class="slot-content">
@@ -2302,61 +2417,137 @@ function initEra2099() {
           `}
         </div>
       `;
+
+      // 点击与键盘回车/空格装配（针对点击选中模式）
+      if (!isRestored) {
+        slot.setAttribute('role', 'button');
+        slot.addEventListener('click', () => {
+          if (selectedFragId) {
+            handleTrySnap(selectedFragId, cfg.id, slot);
+          } else {
+            eggsManager.showToast(`📌 这是【${cfg.era}年代】插槽，请先在右侧选择对应碎片或直接拖拽投放。`);
+          }
+        });
+        slot.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            slot.click();
+          }
+        });
+      }
+
       slotsContainer.appendChild(slot);
 
       // 未吸附的碎片，放置在漂浮池
       if (!isRestored) {
         const fragEl = document.createElement('div');
-        fragEl.className = 'draggable-fragment';
+        fragEl.className = `draggable-fragment ${selectedFragId === cfg.id ? 'selected' : ''}`;
         fragEl.dataset.fragId = cfg.id;
         fragEl.draggable = true;
+        fragEl.setAttribute('tabindex', '0');
+        fragEl.setAttribute('role', 'button');
+        fragEl.setAttribute('aria-label', `${cfg.name}，拖拽或点击进行对位嵌入`);
+
         fragEl.innerHTML = `
           <div class="frag-icon">${cfg.icon}</div>
           <div class="frag-info">
             <strong>${cfg.name}</strong>
             <small>${cfg.era} 年代</small>
           </div>
-          <button class="btn-quick-snap" title="点击智能校准吸附">吸附 ⚡</button>
+          <span style="font-size: 11px; color: #38bdf8; opacity: 0.8;">拖拽/点选</span>
         `;
 
-        // 拖拽事件支持
+        // 拖拽开始
         fragEl.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', cfg.id);
+          fragEl.classList.add('dragging');
         });
 
-        // 移动端/快捷点击吸附
-        const snapBtn = fragEl.querySelector('.btn-quick-snap');
-        snapBtn?.addEventListener('click', () => {
-          doSnapFragment(cfg.id);
+        fragEl.addEventListener('dragend', () => {
+          fragEl.classList.remove('dragging');
         });
 
-        fragEl.addEventListener('click', (e) => {
-          if (e.target.closest('button')) return;
-          doSnapFragment(cfg.id);
+        // 点击切换选中状态
+        fragEl.addEventListener('click', () => {
+          audioManager.playClick();
+          if (selectedFragId === cfg.id) {
+            selectedFragId = null;
+            fragEl.classList.remove('selected');
+            eggsManager.showToast('已取消碎片选定');
+          } else {
+            selectedFragId = cfg.id;
+            fragmentsPool.querySelectorAll('.draggable-fragment').forEach(f => f.classList.remove('selected'));
+            fragEl.classList.add('selected');
+            eggsManager.showToast(`✨ 已选定【${cfg.name}】，请点击左侧对应的 ${cfg.era} 年代插槽`);
+          }
+        });
+
+        // 键盘无障碍支持
+        fragEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fragEl.click();
+          }
         });
 
         fragmentsPool.appendChild(fragEl);
       }
     });
 
-    // 绑定槽位的 DragOver 和 Drop
+    // 绑定槽位的 DragOver, DragLeave, Drop 事件
     slotsContainer.querySelectorAll('.restoration-slot.empty').forEach((slot) => {
       slot.addEventListener('dragover', (e) => {
         e.preventDefault();
         slot.classList.add('dragover');
       });
+
       slot.addEventListener('dragleave', () => {
         slot.classList.remove('dragover');
       });
+
       slot.addEventListener('drop', (e) => {
         e.preventDefault();
         slot.classList.remove('dragover');
         const draggedId = e.dataTransfer.getData('text/plain');
-        if (draggedId) {
-          doSnapFragment(draggedId);
+        const targetId = slot.dataset.targetId;
+        if (draggedId && targetId) {
+          handleTrySnap(draggedId, targetId, slot);
         }
       });
     });
+  }
+
+  // 严格比对碎片投放与槽位目标
+  function handleTrySnap(fragId, targetId, slotEl) {
+    const fragCfg = FRAGMENTS_CONFIG.find(f => f.id === fragId);
+    const targetCfg = FRAGMENTS_CONFIG.find(f => f.id === targetId);
+    if (!fragCfg || !targetCfg) return;
+
+    if (fragId === targetId) {
+      // 对位成功！
+      selectedFragId = null;
+      doSnapFragment(fragId);
+    } else {
+      // 对位失败！严格拒绝吸附并触发弹回与音效
+      audioManager.playReject();
+
+      // 槽位晃动警示
+      slotEl.classList.remove('slot-mismatch');
+      void slotEl.offsetWidth; // 触发 reflow
+      slotEl.classList.add('slot-mismatch');
+      setTimeout(() => slotEl.classList.remove('slot-mismatch'), 500);
+
+      // 碎片弹回反馈
+      const fragEl = fragmentsPool?.querySelector(`[data-frag-id="${fragId}"]`);
+      if (fragEl) {
+        fragEl.classList.remove('frag-bounce-back');
+        void fragEl.offsetWidth;
+        fragEl.classList.add('frag-bounce-back');
+        setTimeout(() => fragEl.classList.remove('frag-bounce-back'), 500);
+      }
+
+      eggsManager.showToast(`⚠️ 时代错位：该碎片属于 ${fragCfg.era} 年代，无法嵌入 ${targetCfg.era} 插槽！请重新匹配。`);
+    }
   }
 
   function doSnapFragment(fragId) {
@@ -2368,14 +2559,14 @@ function initEra2099() {
     restoredIds.push(fragId);
     museumStore.update({ restoredFragments: [...restoredIds] });
 
-    eggsManager.showToast(`✨ 成功修复 ${cfg.era} 年代遗迹碎片：${cfg.name}`);
+    eggsManager.showToast(`✨ 成功吸附修复 ${cfg.era} 年代遗迹：${cfg.name}`);
 
     renderSlotsAndFragments();
     updateProgressUI();
 
     if (restoredIds.length === FRAGMENTS_CONFIG.length) {
       audioManager.playRestorationSuccess();
-      eggsManager.showToast('🎉 全网遗址修复完成！终极历史档案已解密！');
+      eggsManager.showToast('🎉 全网 6 大遗址修复完成！终极历史档案已解密！');
     }
   }
 
@@ -2391,7 +2582,7 @@ function initEra2099() {
 }
 
 
-  // === 主程序启动 ===
+  // === 主程序启动 (app.js) ===
   /**
  * 《404 之前：互联网考古馆》- 主应用入口
  */
@@ -2451,19 +2642,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const introBtn = document.getElementById('btn-museum-intro');
   const introModal = document.getElementById('museum-intro-modal');
   const closeIntroBtn = document.getElementById('btn-close-intro');
+  const startExploreBtn = document.getElementById('btn-start-explore');
+
+  const closeIntroModal = () => {
+    audioManager.playClick();
+    if (introModal) {
+      introModal.classList.remove('visible');
+      setTimeout(() => {
+        introModal.classList.add('hidden');
+      }, 250);
+    }
+  };
 
   if (introBtn && introModal) {
     introBtn.addEventListener('click', () => {
       audioManager.playClick();
       introModal.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        introModal.classList.add('visible');
+      });
     });
   }
 
-  if (closeIntroBtn && introModal) {
-    closeIntroBtn.addEventListener('click', () => {
-      audioManager.playClick();
-      introModal.classList.add('hidden');
-    });
+  if (closeIntroBtn) {
+    closeIntroBtn.addEventListener('click', closeIntroModal);
+  }
+  if (startExploreBtn) {
+    startExploreBtn.addEventListener('click', closeIntroModal);
   }
 
   console.log('🏛️《404 之前：互联网考古馆》已成功启动！穿越 1998 ~ 2099 年代。');

@@ -88,6 +88,16 @@ export function initEra1998() {
     });
   }
 
+  // 绑定图标键盘回车/空格触发无障碍
+  [iconDontClick, iconFloppy, iconCd, iconNetwork].forEach(el => {
+    el?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  });
+
   // 3. 点击彩蛋“不要点.exe”
   if (iconDontClick) {
     iconDontClick.addEventListener('click', () => {
@@ -140,10 +150,17 @@ function showWin98Dialog(title, content) {
   if (bodyEl) bodyEl.textContent = content;
 
   modal.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    modal.classList.add('visible');
+  });
   const closeBtn = modal.querySelector('.win98-dialog-close');
   const okBtn = modal.querySelector('.win98-dialog-ok');
   const closer = () => {
-    modal.classList.add('hidden');
+    audioManager.playClick();
+    modal.classList.remove('visible');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+    }, 250);
     closeBtn?.removeEventListener('click', closer);
     okBtn?.removeEventListener('click', closer);
   };

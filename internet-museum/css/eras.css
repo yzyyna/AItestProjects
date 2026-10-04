@@ -586,6 +586,16 @@
   margin-bottom: 16px;
 }
 
+.forum-quote-box {
+  background: rgba(15, 23, 42, 0.7);
+  border-left: 3px solid #60a5fa;
+  padding: 8px 12px;
+  margin: 6px 0 10px 0;
+  color: #94a3b8;
+  font-size: 12px;
+  border-radius: 0 4px 4px 0;
+}
+
 .floor-signature {
   font-size: 12px;
   color: #64748b;
@@ -1068,4 +1078,48 @@
   line-height: 2;
   margin: 18px 0;
   font-style: italic;
+}
+
+/* ================= 各展厅响应式与小屏适配 ================= */
+@media (max-width: 900px) {
+  .crt-monitor-frame {
+    border-width: 6px;
+    border-radius: 12px;
+    padding: 8px;
+    width: 98%;
+  }
+
+  .win98-window {
+    width: 95%;
+  }
+
+  .y2k-grid-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .forum-floor-item {
+    grid-template-columns: 90px 1fr;
+  }
+
+  .space-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .algo-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .ruins-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .restoration-slots-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 720px) {
+  .crt-screen {
+    min-height: 380px;
+  }
 }

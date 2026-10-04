@@ -339,6 +339,29 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 0.2);
   }
 
+  // 2099 碎片错位弹回错误音
+  playReject() {
+    if (!this.isSoundEnabled()) return;
+    this.ensureContext();
+    if (!this.ctx) return;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(140, this.ctx.currentTime + 0.18);
+
+    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.18);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.18);
+  }
+
   // 2099 终极遗迹修复成功大和弦
   playRestorationSuccess() {
     if (!this.isSoundEnabled()) return;

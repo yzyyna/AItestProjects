@@ -6,6 +6,15 @@
 import { EGGS_METADATA, museumStore } from './state.js';
 import { audioManager } from './audio.js';
 
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export class EggsManager {
   constructor() {
     this.modalEl = null;
@@ -256,9 +265,10 @@ export class EggsManager {
 
   <h2>📝 您沿途留下的数字印记</h2>
   <div class="meta-box">
-    <p><strong>2003年您提交的留言：</strong> ${state.guestbookMessages[state.guestbookMessages.length - 1]?.text || '风之子路过踩踩'}</p>
-    <p><strong>2012年您发布的个性说说：</strong> ${state.spacePosts[0]?.text || '写在青春空间的未眠心情'}</p>
-    <p><strong>2024年算法对您的画像偏好：</strong> 猫咪喜爱度(${state.algorithmPreference.cat}) / 认知效率(${state.algorithmPreference.productivity}) / 情绪共鸣(${state.algorithmPreference.emotion})</p>
+    <p><strong>2003年您提交的留言：</strong> ${escapeHTML(state.guestbookMessages[0]?.text || '风之子路过踩踩')}</p>
+    <p><strong>2008年您发表的论坛回帖：</strong> ${escapeHTML(state.forumReplies?.[0]?.content || '人在江湖漂，哪能不挨刀')}</p>
+    <p><strong>2012年您发布的个性说说：</strong> ${escapeHTML(state.spacePosts[0]?.text || '写在青春空间的未眠心情')}</p>
+    <p><strong>2024年算法对您的画像偏好：</strong> 猫咪喜爱度(${Number(state.algorithmPreference.cat) || 0}) / 认知效率(${Number(state.algorithmPreference.productivity) || 0}) / 情绪共鸣(${Number(state.algorithmPreference.emotion) || 0})</p>
   </div>
 
   <footer>

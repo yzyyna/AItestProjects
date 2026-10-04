@@ -52,21 +52,37 @@ export class NavigationManager {
       }, 60);
     }, { passive: true });
 
-    // 2. 滚轮事件优化：垂直滚轮在展区内平滑转换为横向滚动
+    // 2. 滚轮事件优化：精准判定纵向滚动意图，避免阻碍展厅内容垂直阅读
     this.galleryEl.addEventListener('wheel', (e) => {
-      // 若处于需要纵向滚动的子面板中（如论坛回帖列表或算法卡片流），不抢夺滚轮
-      const scrollableChild = e.target.closest('.inner-scrollable');
-      if (scrollableChild) {
-        const canScrollVertically = scrollableChild.scrollHeight > scrollableChild.clientHeight;
-        if (canScrollVertically && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-          return; // 允许子容器正常上下滚动
-        }
+      // 若主要是横向滚动（如触控板左右轻扫），直接交由原生处理
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        return;
       }
 
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      // 沿着 DOM 树向上检测当前指针所在的所有可垂直滚动的容器（含内部列表与展厅本身）
+      let targetEl = e.target;
+      while (targetEl && targetEl !== this.galleryEl) {
+        const style = window.getComputedStyle(targetEl);
+        const overflowY = style.overflowY;
+        const isScrollContainer = (overflowY === 'auto' || overflowY === 'scroll') && targetEl.scrollHeight > targetEl.clientHeight;
+
+        if (isScrollContainer) {
+          const canScrollUp = e.deltaY < 0 && targetEl.scrollTop > 0;
+          const canScrollDown = e.deltaY > 0 && (targetEl.scrollTop + targetEl.clientHeight < targetEl.scrollHeight - 1);
+
+          // 若当前容器在其垂直方向上还有滚动空间，优先执行正常的垂直滚动！
+          if (canScrollUp || canScrollDown) {
+            return;
+          }
+        }
+        targetEl = targetEl.parentElement;
+      }
+
+      // 仅在当前垂直空间已到顶/到底，或无需纵向滚动的展区内，才将滚轮转换为横向穿梭
+      if (Math.abs(e.deltaY) > 10) {
         e.preventDefault();
         this.galleryEl.scrollBy({
-          left: e.deltaY * 1.5,
+          left: e.deltaY * 1.3,
           behavior: 'auto'
         });
       }

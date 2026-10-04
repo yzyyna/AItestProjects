@@ -57,6 +57,24 @@ const MORE_FLOORS = [
   }
 ];
 
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// 安全解析旧论坛 [quote] 和 [b] 标签
+function formatForumContent(rawText) {
+  const safe = escapeHTML(rawText);
+  return safe
+    .replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote class="forum-quote-box">$1</blockquote>')
+    .replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
 export function initEra2008() {
   const container = document.getElementById('era-2008');
   if (!container) return;
@@ -70,7 +88,6 @@ export function initEra2008() {
   const btnSubmitReply = document.getElementById('btn-forum-submit-reply');
   const ghostCounterEl = document.getElementById('forum-ghost-online');
 
-  // 1. 初始化渲染初始楼层
   let currentLoadedExtra = false;
 
   function renderFloorItem(post) {
@@ -78,18 +95,18 @@ export function initEra2008() {
     floorDiv.className = 'forum-floor-item';
     floorDiv.innerHTML = `
       <div class="floor-sidebar">
-        <div class="user-avatar-badge">${post.avatar}</div>
-        <div class="user-name"><strong>${post.user}</strong></div>
-        <div class="user-rank">${post.rank}</div>
+        <div class="user-avatar-badge">${escapeHTML(post.avatar)}</div>
+        <div class="user-name"><strong>${escapeHTML(post.user)}</strong></div>
+        <div class="user-rank">${escapeHTML(post.rank)}</div>
       </div>
       <div class="floor-main">
         <div class="floor-meta">
-          <span class="floor-tag">${post.floor}</span>
-          <span class="post-time">发表于 ${post.time}</span>
-          <button class="btn-quote-reply" data-floor="${post.floor}" data-user="${post.user}">[引用回复]</button>
+          <span class="floor-tag">${escapeHTML(post.floor)}</span>
+          <span class="post-time">发表于 ${escapeHTML(post.time)}</span>
+          <button class="btn-quote-reply" data-floor="${escapeHTML(post.floor)}" data-user="${escapeHTML(post.user)}">[引用回复]</button>
         </div>
-        <div class="floor-content">${post.content}</div>
-        <div class="floor-signature">${post.signature}</div>
+        <div class="floor-content">${formatForumContent(post.content)}</div>
+        <div class="floor-signature">${escapeHTML(post.signature)}</div>
       </div>
     `;
 
@@ -98,7 +115,8 @@ export function initEra2008() {
     quoteBtn?.addEventListener('click', () => {
       audioManager.playClick();
       if (replyInput) {
-        replyInput.value = `[quote][b]${post.user}[/b] 在 ${post.floor} 说道：\n${post.content.slice(0, 40)}...[/quote]\n` + replyInput.value;
+        const snippet = String(post.content).slice(0, 50);
+        replyInput.value = `[quote][b]${post.user}[/b] 在 ${post.floor} 说道：\n${snippet}...[/quote]\n` + replyInput.value;
         replyInput.focus();
       }
     });
@@ -106,10 +124,15 @@ export function initEra2008() {
     return floorDiv;
   }
 
+  // 初始化楼层渲染：初始楼层 + 本地持久化保存的用户回帖
   function initFloors() {
     if (!floorContainer) return;
     floorContainer.innerHTML = '';
     INITIAL_POSTS.forEach(p => floorContainer.appendChild(renderFloorItem(p)));
+
+    // 恢复历史已保存的回复
+    const savedReplies = museumStore.getState().forumReplies || [];
+    savedReplies.forEach(p => floorContainer.appendChild(renderFloorItem(p)));
   }
 
   initFloors();
@@ -127,7 +150,7 @@ export function initEra2008() {
           MORE_FLOORS.forEach(p => {
             floorContainer.appendChild(renderFloorItem(p));
           });
-          btnLoadMore.textContent = '已展示全部历史楼层';
+          btnLoadMore.textContent = '已展示全部官方历史楼层';
           eggsManager.showToast('📄 已成功加载全部历史楼层讨论！');
         }, 500);
       }
@@ -182,6 +205,12 @@ export function initEra2008() {
         };
         floorContainer.appendChild(renderFloorItem(userPost));
 
+        // 保存用户回帖到全局持久化状态
+        const existingReplies = museumStore.getState().forumReplies || [];
+        museumStore.update({
+          forumReplies: [...existingReplies, userPost]
+        });
+
         // 随机跟帖
         const randomReplies = [
           '楼主淡定，重装系统试试。',
@@ -203,6 +232,13 @@ export function initEra2008() {
             signature: '———— 夜太美，尽管太危险，总有人黑着眼眶修仙。'
           };
           floorContainer.appendChild(renderFloorItem(botPost));
+
+          // 将机器人的回帖也一并持久化存储
+          const updatedReplies = museumStore.getState().forumReplies || [];
+          museumStore.update({
+            forumReplies: [...updatedReplies, botPost]
+          });
+
           eggsManager.showToast('💬 回帖成功！收到论坛网友秒回！');
         }, 700);
 

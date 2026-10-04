@@ -67,19 +67,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const introBtn = document.getElementById('btn-museum-intro');
   const introModal = document.getElementById('museum-intro-modal');
   const closeIntroBtn = document.getElementById('btn-close-intro');
+  const startExploreBtn = document.getElementById('btn-start-explore');
+
+  const closeIntroModal = () => {
+    audioManager.playClick();
+    if (introModal) {
+      introModal.classList.remove('visible');
+      setTimeout(() => {
+        introModal.classList.add('hidden');
+      }, 250);
+    }
+  };
 
   if (introBtn && introModal) {
     introBtn.addEventListener('click', () => {
       audioManager.playClick();
       introModal.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        introModal.classList.add('visible');
+      });
     });
   }
 
-  if (closeIntroBtn && introModal) {
-    closeIntroBtn.addEventListener('click', () => {
-      audioManager.playClick();
-      introModal.classList.add('hidden');
-    });
+  if (closeIntroBtn) {
+    closeIntroBtn.addEventListener('click', closeIntroModal);
+  }
+  if (startExploreBtn) {
+    startExploreBtn.addEventListener('click', closeIntroModal);
   }
 
   console.log('🏛️《404 之前：互联网考古馆》已成功启动！穿越 1998 ~ 2099 年代。');

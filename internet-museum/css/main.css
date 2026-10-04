@@ -265,6 +265,11 @@
   transform: translateY(-2px);
 }
 
+.timeline-node:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 4px;
+}
+
 .node-dot {
   width: 14px;
   height: 14px;
@@ -584,4 +589,60 @@
 .museum-toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* ================= 响应式与小屏适配 ================= */
+@media (max-width: 960px) {
+  :root {
+    --topbar-height: 52px;
+    --bottombar-height: 60px;
+  }
+
+  .top-locator {
+    padding: 0 10px;
+  }
+
+  .museum-brand span:nth-child(2) {
+    display: none;
+  }
+
+  .locator-center {
+    max-width: 280px;
+    padding: 4px 10px;
+  }
+
+  .network-status-text {
+    display: none;
+  }
+
+  .header-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .bottom-timeline {
+    padding: 0 10px;
+  }
+
+  .nav-direction-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .timeline-track-container {
+    margin: 0 10px;
+  }
+
+  .node-label {
+    display: none;
+  }
+
+  .node-year {
+    font-size: 11px;
+  }
+
+  .archaeology-drawer {
+    width: 100vw;
+    max-width: 100vw;
+  }
 }

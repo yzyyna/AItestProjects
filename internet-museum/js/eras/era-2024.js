@@ -265,10 +265,18 @@ function showTransparencyModal() {
   const modal = document.getElementById('algorithm-transparency-modal');
   if (!modal) return;
   modal.classList.remove('hidden');
-  const closeBtn = modal.querySelector('.btn-close-transparency');
+  requestAnimationFrame(() => {
+    modal.classList.add('visible');
+  });
+
+  const closeBtns = modal.querySelectorAll('.btn-close-transparency');
   const closer = () => {
-    modal.classList.add('hidden');
-    closeBtn?.removeEventListener('click', closer);
+    audioManager.playClick();
+    modal.classList.remove('visible');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+    }, 250);
+    closeBtns.forEach(btn => btn.removeEventListener('click', closer));
   };
-  closeBtn?.addEventListener('click', closer);
+  closeBtns.forEach(btn => btn.addEventListener('click', closer));
 }

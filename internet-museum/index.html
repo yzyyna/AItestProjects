@@ -56,19 +56,19 @@
             <div class="win98-desktop-area">
               <!-- 桌面图标列表 -->
               <div class="win98-desktop-icons">
-                <div id="icon-1998-network" class="win98-icon-item" title="点击查看网上邻居">
+                <div id="icon-1998-network" class="win98-icon-item" tabindex="0" role="button" aria-label="网上邻居" title="点击查看网上邻居">
                   <div class="icon-img-sim">🌐</div>
                   <div class="icon-label-sim">网上邻居</div>
                 </div>
-                <div id="icon-1998-floppy" class="win98-icon-item" title="点击读取 3.5 英寸软盘">
+                <div id="icon-1998-floppy" class="win98-icon-item" tabindex="0" role="button" aria-label="3.5英寸软盘(A:)" title="点击读取 3.5 英寸软盘">
                   <div class="icon-img-sim">💾</div>
                   <div class="icon-label-sim">3.5英寸软盘(A:)</div>
                 </div>
-                <div id="icon-1998-cd" class="win98-icon-item" title="点击查看光驱">
+                <div id="icon-1998-cd" class="win98-icon-item" tabindex="0" role="button" aria-label="电脑光盘(D:)" title="点击查看光驱">
                   <div class="icon-img-sim">💿</div>
                   <div class="icon-label-sim">电脑光盘(D:)</div>
                 </div>
-                <div id="icon-1998-dontclick" class="win98-icon-item clickable" title="【危险警告】禁止双击该程序！">
+                <div id="icon-1998-dontclick" class="win98-icon-item clickable" tabindex="0" role="button" aria-label="不要点.exe" title="【危险警告】禁止双击该程序！">
                   <div class="icon-img-sim">⚠️</div>
                   <div class="icon-label-sim">不要点.exe</div>
                 </div>
@@ -360,9 +360,12 @@
                 收集 1998 ~ 2024 年代的 6 块核心文明记忆碎片，将其吸附对位，重构消逝在 404 浩劫中的人类互联网历史。
               </p>
             </div>
-            <div style="text-align: right;">
+            <div style="text-align: right; min-width: 140px;">
               <span style="font-size: 12px; color: #94a3b8;">遗迹修复度</span>
               <div id="restoration-percent" style="font-size: 26px; color: #10b981; font-weight: 900;">0%</div>
+              <div class="ruins-progress-bar" style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 4px;">
+                <div id="restoration-progress-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #06b6d4); transition: width 0.35s ease;"></div>
+              </div>
             </div>
           </div>
 
@@ -410,36 +413,36 @@
         <div class="timeline-progress-fill"></div>
 
         <div class="timeline-nodes-wrapper">
-          <div class="timeline-node active" data-year="1998">
-            <div class="node-dot"></div>
+          <button type="button" class="timeline-node active" data-year="1998" aria-label="跳转到 1998 年代拨号接入室">
+            <span class="node-dot"></span>
             <span class="node-year">1998</span>
             <span class="node-label">拨号接入</span>
-          </div>
-          <div class="timeline-node" data-year="2003">
-            <div class="node-dot"></div>
+          </button>
+          <button type="button" class="timeline-node" data-year="2003" aria-label="跳转到 2003 年代个人主页花园">
+            <span class="node-dot"></span>
             <span class="node-year">2003</span>
             <span class="node-label">主页花园</span>
-          </div>
-          <div class="timeline-node" data-year="2008">
-            <div class="node-dot"></div>
+          </button>
+          <button type="button" class="timeline-node" data-year="2008" aria-label="跳转到 2008 年代深夜论坛">
+            <span class="node-dot"></span>
             <span class="node-year">2008</span>
             <span class="node-label">深夜论坛</span>
-          </div>
-          <div class="timeline-node" data-year="2012">
-            <div class="node-dot"></div>
+          </button>
+          <button type="button" class="timeline-node" data-year="2012" aria-label="跳转到 2012 年代青春空间">
+            <span class="node-dot"></span>
             <span class="node-year">2012</span>
             <span class="node-label">青春空间</span>
-          </div>
-          <div class="timeline-node" data-year="2024">
-            <div class="node-dot"></div>
+          </button>
+          <button type="button" class="timeline-node" data-year="2024" aria-label="跳转到 2024 年代算法走廊">
+            <span class="node-dot"></span>
             <span class="node-year">2024</span>
             <span class="node-label">算法走廊</span>
-          </div>
-          <div class="timeline-node" data-year="2099">
-            <div class="node-dot"></div>
+          </button>
+          <button type="button" class="timeline-node" data-year="2099" aria-label="跳转到 2099 年代网页遗址修复中心">
+            <span class="node-dot"></span>
             <span class="node-year">2099</span>
             <span class="node-label">遗址修复</span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -550,7 +553,7 @@
           </ul>
         </div>
         <div style="text-align: right; margin-top: 18px;">
-          <button onclick="document.getElementById('museum-intro-modal').classList.add('hidden')" class="btn-primary-modal">开始探索之旅 🚀</button>
+          <button id="btn-start-explore" class="btn-primary-modal">开始探索之旅 🚀</button>
         </div>
       </div>
     </div>

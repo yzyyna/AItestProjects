@@ -169,6 +169,30 @@
   100% { transform: scale(1.15) rotate(6deg); }
 }
 
+/* 2099 碎片错位弹回震颤动画 */
+@keyframes shakeSlot {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.restoration-slot.slot-mismatch {
+  animation: shakeSlot 0.4s ease;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+}
+
+.draggable-fragment.frag-bounce-back {
+  animation: shakeSlot 0.4s ease;
+  border-color: #ef4444 !important;
+}
+
+.draggable-fragment.selected {
+  border-color: #facc15 !important;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.6) !important;
+  transform: translateY(-3px) scale(1.02);
+}
+
 /* 尊重用户系统 prefers-reduced-motion 设置 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
