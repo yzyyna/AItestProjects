@@ -3,6 +3,25 @@
  * Pure Vanilla JavaScript (Zero External Dependencies)
  */
 
+// Offline-ready SVG Avatar Generator
+function getAvatarSvg(seed) {
+  const s = String(seed || 'User').trim();
+  const colors = [
+    ['#3b82f6', '#1d4ed8'],
+    ['#10b981', '#047857'],
+    ['#8b5cf6', '#6d28d9'],
+    ['#f59e0b', '#b45309'],
+    ['#ec4899', '#be185d'],
+    ['#06b6d4', '#0e7490']
+  ];
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
+  const pair = colors[Math.abs(hash) % colors.length];
+  const char = (s[0] || 'U').toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><defs><linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${pair[0]}"/><stop offset="100%" stop-color="${pair[1]}"/></linearGradient></defs><rect width="40" height="40" rx="20" fill="url(#g_${Math.abs(hash)})"/><text x="20" y="25" font-family="-apple-system,sans-serif" font-weight="700" font-size="18" fill="#ffffff" text-anchor="middle">${char}</text></svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
 // Application State
 const STATE = {
   user: null, // { name, avatar }
@@ -21,9 +40,9 @@ const STATE = {
   learnIndex: 0,
   isFlipped: false,
   posts: [
-    { id: 1, author: 'Alex', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex', content: '今天终于突破了 B2 等级的职场沟通测试！感谢大家的资料分享。', likes: 124, comments: 12, time: '2小时前', liked: false },
-    { id: 2, author: 'Sarah', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah', content: '大家有没有好的商务英文跟读技巧推荐？感觉会议发言语调总是偏生硬。', likes: 45, comments: 38, time: '5小时前', liked: false },
-    { id: 3, author: 'Ken', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ken', content: '分享一份我整理的韩语初级到中级语法思维导图，需要的自取~ 📝', likes: 892, comments: 156, time: '昨天', liked: false },
+    { id: 1, author: 'Alex', avatar: getAvatarSvg('Alex'), content: '今天终于突破了 B2 等级的职场沟通测试！感谢大家的资料分享。', likes: 124, comments: 12, time: '2小时前', liked: false },
+    { id: 2, author: 'Sarah', avatar: getAvatarSvg('Sarah'), content: '大家有没有好的商务英文跟读技巧推荐？感觉会议发言语调总是偏生硬。', likes: 45, comments: 38, time: '5小时前', liked: false },
+    { id: 3, author: 'Ken', avatar: getAvatarSvg('Ken'), content: '分享一份我整理的韩语初级到中级语法思维导图，需要的自取~ 📝', likes: 892, comments: 156, time: '昨天', liked: false },
   ],
 };
 
@@ -126,7 +145,7 @@ function loginUser(name) {
   const cleanName = name.trim() || '学员';
   STATE.user = {
     name: cleanName,
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanName)}`,
+    avatar: getAvatarSvg(cleanName),
   };
   saveState();
   updateUserUI();
@@ -438,7 +457,7 @@ function submitNewPost() {
 
   const content = textarea.value.trim();
   const authorName = STATE.user ? STATE.user.name : '学员';
-  const avatarUrl = STATE.user ? STATE.user.avatar : 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest';
+  const avatarUrl = STATE.user ? STATE.user.avatar : getAvatarSvg('Guest');
 
   const newPost = {
     id: Date.now(),
@@ -485,9 +504,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginInput = document.getElementById('login-name-input');
   const loginAvatar = document.getElementById('login-preview-avatar');
   if (loginInput && loginAvatar) {
+    loginAvatar.src = getAvatarSvg('Guest');
     loginInput.addEventListener('input', (e) => {
       const val = e.target.value.trim() || 'Guest';
-      loginAvatar.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(val)}`;
+      loginAvatar.src = getAvatarSvg(val);
     });
   }
 });
