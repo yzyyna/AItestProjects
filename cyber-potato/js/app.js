@@ -19,6 +19,9 @@
   const elLiveClock = document.getElementById('liveClock');
   const elSleepBtnIcon = document.getElementById('sleepBtnIcon');
   const elSleepBtnText = document.getElementById('sleepBtnText');
+  const elCrtScreen = document.querySelector('.crt-screen');
+  const elPetTitleBadge = document.getElementById('petTitleBadge');
+  const elPetAgeText = document.getElementById('petAgeText');
 
   // 模态框
   const modalResignation = document.getElementById('modalResignation');
@@ -33,6 +36,19 @@
   let pokeTimestamps = [];
   let rageTimeout = null;
 
+  // 屏幕震颤与移动端震动反馈 (Haptic)
+  function triggerScreenShake(hapticMs = 40) {
+    if (elCrtScreen) {
+      elCrtScreen.classList.remove('screen-shake');
+      void elCrtScreen.offsetWidth;
+      elCrtScreen.classList.add('screen-shake');
+      setTimeout(() => elCrtScreen.classList.remove('screen-shake'), 350);
+    }
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(hapticMs); } catch (e) {}
+    }
+  }
+
   // 1. 初始化入口
   function init() {
     // 加载存档与离线时间推演
@@ -46,6 +62,7 @@
     bindActionButtons();
     bindModals();
     bindPotatoDirectClick();
+    bindKeyboardShortcuts();
 
     // 监听状态改变
     window.PotatoState.addChangeListener(onStateChanged);
@@ -130,6 +147,28 @@
 
     // 状态修饰类更新
     updateCharacterClasses(state);
+
+    // 存活天数与成长度称号更新
+    if (elPetAgeText && elPetTitleBadge) {
+      const birth = state.birthTime || Date.now();
+      const days = Math.max(1, Math.floor((Date.now() - birth) / 86400000) + 1);
+      elPetAgeText.textContent = `Day ${days}`;
+
+      const totalInteractions = 
+        (state.counters.feedCount || 0) +
+        (state.counters.coffeeCount || 0) +
+        (state.counters.bookCount || 0) +
+        (state.counters.pokeCount || 0) +
+        (state.counters.petCount || 0);
+
+      let title = '萌芽淀粉块';
+      if (totalInteractions >= 150) title = '薯门统帅·碳水主宰';
+      else if (totalInteractions >= 70) title = '资深赛博马铃薯';
+      else if (totalInteractions >= 30) title = '高级老油条薯';
+      else if (totalInteractions >= 10) title = '入门级打工薯';
+
+      elPetTitleBadge.textContent = title;
+    }
   }
 
   function setBarColorClass(el, val) {
@@ -251,6 +290,7 @@
         // 触发过载狂暴！
         state.counters.overloadCount = (state.counters.overloadCount || 0) + 1;
         window.PotatoAudio.playAlarm();
+        triggerScreenShake(80);
         window.PotatoDialogue.say(null, 'overload');
 
         // 检查解锁赛博义眼
@@ -381,6 +421,7 @@
     if (pokeTimestamps.length >= 5) {
       elPotatoChar.classList.add('is-raging');
       window.PotatoAudio.playAlarm();
+      triggerScreenShake(60);
       window.PotatoDialogue.say(null, 'rage');
 
       if (rageTimeout) clearTimeout(rageTimeout);
@@ -575,9 +616,60 @@
 
   function showResignationModal() {
     window.PotatoAudio.playStamp();
-    document.getElementById('resignationDate').textContent = new Date().toISOString().split('T')[0];
+    triggerScreenShake(100);
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const localDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    document.getElementById('resignationDate').textContent = localDate;
     modalResignation.classList.add('open');
     window.PotatoDialogue.say(null, 'resigned');
+  }
+
+  // 10. 全局键盘快捷键
+  function bindKeyboardShortcuts() {
+    window.addEventListener('keydown', (e) => {
+      // 避免输入框冲突
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+      const key = e.key.toLowerCase();
+      // 长按键盘防刷防挂
+      if (e.repeat && ['4', 'p', '1', 'f', '2', 'c'].includes(key)) return;
+      const btnMap = {
+        '1': 'btnFeed',
+        'f': 'btnFeed',
+        '2': 'btnCoffee',
+        'c': 'btnCoffee',
+        '3': 'btnRead',
+        'r': 'btnRead',
+        '4': 'btnPoke',
+        'p': 'btnPoke',
+        '5': 'btnSleep',
+        's': 'btnSleep',
+        '6': 'btnPet',
+        'h': 'btnPet',
+        ' ': 'btnSayRandom',
+        'm': 'btnMute',
+        'w': 'btnWardrobe',
+        't': 'btnTimeMachine'
+      };
+
+      if (e.key === 'Escape') {
+        modalWardrobe.classList.remove('open');
+        modalTimeMachine.classList.remove('open');
+        return;
+      }
+
+      const btnId = btnMap[key];
+      if (btnId) {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+          if (key === ' ') e.preventDefault();
+          btn.classList.add('is-active-press');
+          setTimeout(() => btn.classList.remove('is-active-press'), 140);
+          btn.click();
+        }
+      }
+    });
   }
 
   function updateMuteUI() {

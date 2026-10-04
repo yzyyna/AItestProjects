@@ -148,3 +148,25 @@
     opacity: 0;
   }
 }
+
+/* 14. 植物幼芽与蘑菇轻微摇曳 */
+@keyframes plant-sway {
+  0%, 100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  30% {
+    transform: translateX(-50%) rotate(-5deg);
+  }
+  70% {
+    transform: translateX(-50%) rotate(5deg);
+  }
+}
+
+@keyframes mushroom-bounce {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.06, 0.94) translateY(1px);
+  }
+}

@@ -40,6 +40,12 @@ window.PotatoState = (function () {
   let tickTimer = null;
   let onStateChangeListeners = [];
 
+  function sanitizeNum(val, def, min = 0, max = Infinity) {
+    const num = Number(val);
+    if (!Number.isFinite(num) || Number.isNaN(num)) return def;
+    return Math.min(max, Math.max(min, num));
+  }
+
   // 从 localStorage 加载并执行离线推演
   function load() {
     try {
@@ -57,6 +63,14 @@ window.PotatoState = (function () {
             active: { ...(parsed.accessories && parsed.accessories.active) }
           }
         };
+
+        // 数据自愈与清洗，防止 NaN 污染
+        state.stats.hunger = sanitizeNum(state.stats.hunger, 80, 0, 100);
+        state.stats.energy = sanitizeNum(state.stats.energy, 85, 0, 150);
+        state.stats.sanity = sanitizeNum(state.stats.sanity, 90, 0, 100);
+        state.stats.overheat = sanitizeNum(state.stats.overheat, 0, 0, 100);
+        state.lastSaveTime = sanitizeNum(state.lastSaveTime, Date.now(), 0);
+        state.birthTime = sanitizeNum(state.birthTime, Date.now(), 0);
 
         // 离线时间推演
         simulateOfflineProgress();

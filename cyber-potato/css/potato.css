@@ -30,6 +30,7 @@
   transition: filter 0.3s ease;
   animation: potato-breathe 2.8s ease-in-out infinite;
   transform-origin: center bottom;
+  touch-action: manipulation;
 }
 
 /* 受击形变类 (JS 动态追加) */
@@ -441,7 +442,8 @@
 }
 .accessory-sprout.active {
   display: block;
-  animation: potato-sleepy 3s ease-in-out infinite;
+  animation: plant-sway 2.4s ease-in-out infinite;
+  transform-origin: center bottom;
 }
 .sprout-stem {
   position: absolute;
@@ -489,6 +491,8 @@
 }
 .accessory-mushroom.active {
   display: block;
+  animation: mushroom-bounce 2s ease-in-out infinite;
+  transform-origin: center bottom;
 }
 .mushroom-cap {
   position: absolute;

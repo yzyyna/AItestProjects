@@ -5,13 +5,21 @@
 
 window.PotatoAudio = (function () {
   let audioCtx = null;
-  let isMuted = localStorage.getItem('cyber_potato_muted') === 'true';
+  let masterGain = null;
+  let lastToneTime = 0;
+  let isMuted = false;
+  try {
+    isMuted = localStorage.getItem('cyber_potato_muted') === 'true';
+  } catch (e) {}
 
   function getContext() {
     if (!audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (AudioContextClass) {
         audioCtx = new AudioContextClass();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+        masterGain.connect(audioCtx.destination);
       }
     }
     if (audioCtx && audioCtx.state === 'suspended') {
@@ -22,7 +30,9 @@ window.PotatoAudio = (function () {
 
   function setMuted(muted) {
     isMuted = muted;
-    localStorage.setItem('cyber_potato_muted', muted ? 'true' : 'false');
+    try {
+      localStorage.setItem('cyber_potato_muted', muted ? 'true' : 'false');
+    } catch (e) {}
   }
 
   function toggleMute() {
@@ -30,12 +40,16 @@ window.PotatoAudio = (function () {
     return isMuted;
   }
 
-  // 基础蜂鸣音 (方波/三角波)
+  // 基础蜂鸣音 (方波/三角波/正弦波)
   function playTone(freq, type = 'square', duration = 0.08, startVol = 0.1, stopVol = 0.001) {
     if (isMuted) return;
+    const now = Date.now();
+    if (now - lastToneTime < 16) return; // 频率节流防爆音
+    lastToneTime = now;
+
     try {
       const ctx = getContext();
-      if (!ctx) return;
+      if (!ctx || !masterGain) return;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -46,7 +60,7 @@ window.PotatoAudio = (function () {
       gain.gain.exponentialRampToValueAtTime(stopVol, ctx.currentTime + duration);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain);
 
       osc.start();
       osc.stop(ctx.currentTime + duration);
@@ -98,7 +112,7 @@ window.PotatoAudio = (function () {
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain || ctx.destination);
 
       osc.start();
       osc.stop(ctx.currentTime + 0.35);
@@ -131,7 +145,7 @@ window.PotatoAudio = (function () {
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain || ctx.destination);
 
       osc.start();
       osc.stop(ctx.currentTime + 0.14);
@@ -164,7 +178,7 @@ window.PotatoAudio = (function () {
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(masterGain || ctx.destination);
 
       osc.start();
       osc.stop(ctx.currentTime + 0.25);

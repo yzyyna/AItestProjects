@@ -18,6 +18,7 @@ body {
   padding: 20px;
   overflow-x: hidden;
   user-select: none;
+  touch-action: manipulation;
 }
 
 /* 顶部导航与项目标语 */
@@ -196,11 +197,39 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+}
+.title-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(246, 200, 106, 0.15);
+  color: #f6c86a;
+  border: 1px solid rgba(246, 200, 106, 0.4);
+}
+.age-text {
+  font-size: 10px;
+  color: #60c588;
+  margin-right: 4px;
 }
 .clock-text {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: #48a773;
+  display: flex;
+  align-items: center;
+}
+
+/* 屏幕震颤效果 (Jolt / Shake) */
+.crt-screen.screen-shake {
+  animation: crt-shake 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+@keyframes crt-shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
+  40%, 60% { transform: translate3d(3px, 0, 0); }
 }
 
 /* 状态条网格 */
@@ -322,6 +351,7 @@ body {
 }
 
 .action-btn {
+  position: relative;
   background: linear-gradient(180deg, #374151, #1f2937);
   border: 2px solid #4b5563;
   color: #f3f4f6;
@@ -340,6 +370,25 @@ body {
     0 5px 8px rgba(0, 0, 0, 0.4);
   transition: all 0.1s ease;
   outline: none;
+  touch-action: manipulation;
+}
+.key-badge {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  font-size: 9px;
+  font-family: monospace;
+  padding: 1px 4px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.action-btn.is-active-press {
+  transform: translateY(3px) !important;
+  box-shadow: 0 1px 0 #111827 !important;
+  filter: brightness(1.25) !important;
 }
 .action-btn:hover {
   filter: brightness(1.15);

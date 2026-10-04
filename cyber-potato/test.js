@@ -110,4 +110,18 @@ const parsed = JSON.parse(raw);
 assert.strictEqual(parsed.counters.resignedTimes, 2, '挽留历史计数应被正确累加与存储');
 console.log('   ✅ 持久化存储与恢复测试通过');
 
-console.log('\n🎉 所有 6 大核心场景逻辑测试全部通过！');
+// 测试 7: 脏数据自愈与容错
+console.log('▶️ [Test 7] 脏数据注入与自动净化测试');
+localStorage.setItem('cyber_potato_save_v1', JSON.stringify({
+  stats: { hunger: NaN, energy: -999, sanity: 'invalid_data', overheat: 9999 },
+  birthTime: 'invalid_time'
+}));
+window.PotatoState.load();
+const healed = window.PotatoState.getState();
+assert(Number.isFinite(healed.stats.hunger) && healed.stats.hunger >= 0 && healed.stats.hunger <= 100, 'hunger 应被清洗为合法数值');
+assert(Number.isFinite(healed.stats.energy) && healed.stats.energy >= 0, 'energy 应被清洗为非负合法数值');
+assert(Number.isFinite(healed.stats.sanity) && healed.stats.sanity >= 0 && healed.stats.sanity <= 100, 'sanity 应被清洗为合法数值');
+assert(Number.isFinite(healed.stats.overheat) && healed.stats.overheat <= 100, 'overheat 应被约束在上限范围内');
+console.log('   ✅ 脏数据自愈与健壮性校验通过');
+
+console.log('\n🎉 所有 7 大核心场景与健壮性测试全部通过！');
