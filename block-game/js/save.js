@@ -10,7 +10,7 @@
       var raw = localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY);
       if (!raw) return null;
       var obj = JSON.parse(raw);
-      if (!obj || typeof obj.seed !== 'number') return null;
+      if (!obj || typeof obj.seed !== 'number' || isNaN(obj.seed)) return null;
       return obj;
     } catch (e) { return null; }
   }

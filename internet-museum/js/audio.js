@@ -76,8 +76,7 @@ class AudioManager {
 
   // 1998 经典拨号声合成（双音多频 DTMF + 调制解调器握手噪波）
   playDialup(onProgress, onComplete) {
-    if (!this.isSoundEnabled()) {
-      // 声音关闭时，仅通过定时器通知步骤
+    const playFallbackSteps = () => {
       const steps = [
         { text: '初始化端口 COM1...', delay: 600 },
         { text: '正在拨号 ATDT 16300...', delay: 1800 },
@@ -94,11 +93,18 @@ class AudioManager {
       setTimeout(() => {
         if (onComplete) onComplete();
       }, 7200);
+    };
+
+    if (!this.isSoundEnabled()) {
+      playFallbackSteps();
       return;
     }
 
     this.ensureContext();
-    if (!this.ctx) return;
+    if (!this.ctx) {
+      playFallbackSteps();
+      return;
+    }
 
     const now = this.ctx.currentTime;
 
@@ -116,7 +122,7 @@ class AudioManager {
       osc1.frequency.value = pair[0];
       osc2.frequency.value = pair[1];
       g.gain.setValueAtTime(0.08, toneTime);
-      g.gain.setValueAtTime(0.001, toneTime + 0.14);
+      g.gain.exponentialRampToValueAtTime(0.001, toneTime + 0.14);
 
       osc1.connect(g);
       osc2.connect(g);

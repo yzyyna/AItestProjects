@@ -79,15 +79,30 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   };
 
-  /* 每次生成新画布：同一 canvas 元素不能同时挂在快捷栏与背包两处 DOM */
+  /* 离屏缓存加速：同一 canvas 元素不能同时挂在快捷栏与背包两处 DOM，通过缓存复用 drawImage 复制 */
+  Hud.prototype.getIconCache = function (blockId) {
+    if (!this._iconCache) this._iconCache = {};
+    if (!this._iconCache[blockId]) {
+      var c = document.createElement('canvas');
+      c.width = 40; c.height = 40;
+      this.drawIcon(c, blockId);
+      this._iconCache[blockId] = c;
+    }
+    return this._iconCache[blockId];
+  };
+
   Hud.prototype.iconFor = function (blockId) {
+    var cached = this.getIconCache(blockId);
     var c = document.createElement('canvas');
     c.width = 40; c.height = 40;
-    this.drawIcon(c, blockId);
+    var ctx = c.getContext('2d');
+    ctx.drawImage(cached, 0, 0);
     return c;
   };
 
-  Hud.prototype.invalidateIcons = function () { /* 兼容保留：图标即画即用，无缓存需清理 */ };
+  Hud.prototype.invalidateIcons = function () {
+    this._iconCache = {};
+  };
 
   /* ---------- 快捷栏 ---------- */
   Hud.prototype.buildHotbar = function (inventory) {

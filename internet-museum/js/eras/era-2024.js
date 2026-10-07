@@ -126,7 +126,15 @@ export function initEra2024() {
   }
 
   // 2. 渲染推荐信息流卡片
+  const activeHoverTimers = new Set();
+
+  function clearAllHoverTimers() {
+    activeHoverTimers.forEach(t => clearTimeout(t));
+    activeHoverTimers.clear();
+  }
+
   function renderFeedCards() {
+    clearAllHoverTimers();
     if (!feedListEl) return;
     feedListEl.innerHTML = '';
 
@@ -181,14 +189,19 @@ export function initEra2024() {
     let hoverTimer = null;
     card.addEventListener('mouseenter', () => {
       hoverTimer = setTimeout(() => {
+        activeHoverTimers.delete(hoverTimer);
         preference[catObj.key] = (preference[catObj.key] || 0) + 1;
         saveAndRefresh();
         showMicroFeedback(card, '视线停留 +1 分');
       }, 2000);
+      activeHoverTimers.add(hoverTimer);
     });
 
     card.addEventListener('mouseleave', () => {
-      clearTimeout(hoverTimer);
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        activeHoverTimers.delete(hoverTimer);
+      }
     });
 
     // 点开/点击卡片加 3 分

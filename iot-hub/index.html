@@ -240,6 +240,8 @@ const nowStr=()=>new Date().toLocaleString();
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const debounce=(fn,ms)=>{let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
 const fmt=(n,d=1)=>Number(n).toFixed(d);
+const escapeHTML=(s)=>{if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')};
+const escapeCsvCell=(v)=>{if(v==null)return'""';const s=String(v);if(s.includes('"')||s.includes(',')||s.includes('\n')||s.includes('\r'))return '"'+s.replace(/"/g,'""')+'"';return s};
 
 /* ========== Logger ========== */
 class Logger{constructor(){this.logs=[];this.debug=true} log(level,module,event,meta={}){const e={time:Date.now(),level,module,event,meta};this.logs.push(e);if(this.logs.length>500)this.logs.shift();if(this.debug && level!=='debug') console[level==='error'?'error':level==='warn'?'warn':'log'](`[${level}] ${module} ${event}`,meta)} debug(m,e,meta){this.log('debug',m,e,meta)} info(m,e,meta){this.log('info',m,e,meta)} warn(m,e,meta){this.log('warn',m,e,meta)} error(m,e,meta){this.log('error',m,e,meta)} recent(n=100){return this.logs.slice(-n)}}
@@ -410,7 +412,7 @@ class VirtualList{
       row.className='row'+(sel.has(d.id)?' sel':'');
       row.dataset.id=d.id;
       row.draggable=true;
-      row.innerHTML=`<div><input type="checkbox" ${sel.has(d.id)?'checked':''}></div><div class="id">${d.id}</div><div>${d.name}</div><div>${d.cpu}%<div class="meter"><i style="width:${clamp(d.cpu,0,100)}%"></i></div></div><div>${fmt(d.temperature)}°C</div><div>${fmt(d.power)}W</div><div>${d.latency}ms</div><div>${d.battery}%</div><div><span class="tag">${d.region}</span> ${d.city}</div><div><span class="status ${d.status}">${d.status}</span></div>`;
+      row.innerHTML=`<div><input type="checkbox" ${sel.has(d.id)?'checked':''}></div><div class="id">${escapeHTML(d.id)}</div><div>${escapeHTML(d.name)}</div><div>${d.cpu}%<div class="meter"><i style="width:${clamp(d.cpu,0,100)}%"></i></div></div><div>${fmt(d.temperature)}°C</div><div>${fmt(d.power)}W</div><div>${d.latency}ms</div><div>${d.battery}%</div><div><span class="tag">${escapeHTML(d.region)}</span> ${escapeHTML(d.city)}</div><div><span class="status ${escapeHTML(d.status)}">${escapeHTML(d.status)}</span></div>`;
       row.addEventListener('click',(e)=>{ if(e.target.type==='checkbox'){toggleSelection(d.id,e)} else {handleRowClick(d.id,e)} });
       row.addEventListener('dragstart',(e)=>{e.dataTransfer.setData('text/plain',d.id);e.dataTransfer.effectAllowed='move'});
       frag.appendChild(row);
@@ -618,7 +620,7 @@ function updateHeader(){
 function updateSelectInfo(){ $('#selectInfo').textContent=`已选: ${store.getState().selection.size}`; $('#chkHead').checked=store.getState().selection.size && store.getState().selection.size===filteredSorted.length; }
 function renderAlarms(){
   const list=$('#alarmList'); const lvl=$('#alarmLevel').value; const alarms=store.getState().alarms.filter(a=> !lvl || a.level===lvl).slice(0,200);
-  list.innerHTML=alarms.map(a=>`<div class="alarm"><div><b>${a.type} · ${a.level}</b> <small><span class="alarm-link" data-dev="${a.deviceId}">${a.deviceId}</span> 值 ${fmt(a.value)} 阈值 ${a.threshold}</small><br><small>${new Date(a.timestamp).toLocaleString()}</small></div><span style="display:flex;gap:6px"><button class="btn small" data-ack="${a.id}">${a.acknowledged?'已确认':'确认'}</button><button class="btn small" data-del="${a.id}">删除</button></span></div>`).join('')||'<small style="color:var(--muted)">暂无告警</small>';
+  list.innerHTML=alarms.map(a=>`<div class="alarm"><div><b>${escapeHTML(a.type)} · ${escapeHTML(a.level)}</b> <small><span class="alarm-link" data-dev="${escapeHTML(a.deviceId)}">${escapeHTML(a.deviceId)}</span> 值 ${fmt(a.value)} 阈值 ${a.threshold}</small><br><small>${new Date(a.timestamp).toLocaleString()}</small></div><span style="display:flex;gap:6px"><button class="btn small" data-ack="${escapeHTML(a.id)}">${a.acknowledged?'已确认':'确认'}</button><button class="btn small" data-del="${escapeHTML(a.id)}">删除</button></span></div>`).join('')||'<small style="color:var(--muted)">暂无告警</small>';
 }
 function renderGroups(){
   const groups=store.getState().groups; const sel=store.getState().selectedGroup; const map=new Map(groups.map(g=>[g.id,g])); const roots=groups.filter(g=>!g.parent);
@@ -629,14 +631,14 @@ function renderGroups(){
     const hasKids=kids.length>0;
     const isCol=collapsed.has(g.id);
     const toggleSymbol=hasKids?(isCol?'▸':'▾'):'·';
-    let html=`<div class="node${active}" draggable="true" data-gid="${g.id}" style="margin-left:${depth*8}px"><span class="tree-toggle" data-toggle="${g.id}">${toggleSymbol}</span> <b>${g.name}</b> <small style="color:var(--muted)">(${store.getState().devices.filter(d=>d.groupIds.includes(g.id)).length})</small></div>`;
+    let html=`<div class="node${active}" draggable="true" data-gid="${escapeHTML(g.id)}" style="margin-left:${depth*8}px"><span class="tree-toggle" data-toggle="${escapeHTML(g.id)}">${toggleSymbol}</span> <b>${escapeHTML(g.name)}</b> <small style="color:var(--muted)">(${store.getState().devices.filter(d=>d.groupIds.includes(g.id)).length})</small></div>`;
     if(hasKids && !isCol) html+=`<div class="children">${kids.map(k=>renderNode(k,depth+1)).join('')}</div>`;
     return html;
   }
   $('#groupTree').innerHTML=roots.map(r=>renderNode(r)).join('');
   $('#groupCount').textContent=groups.length;
   // tags
-  $('#tagBox').innerHTML=store.getState().tags.map(t=>`<span class="tag">${t}</span>`).join('');
+  $('#tagBox').innerHTML=store.getState().tags.map(t=>`<span class="tag">${escapeHTML(t)}</span>`).join('');
 }
 function renderDrawer(id, preserveScroll=false){
   const d=store.getState().deviceMap.get(id); if(!d) return;
@@ -651,12 +653,12 @@ function renderDrawer(id, preserveScroll=false){
 }
 function buildDrawer(d){
   const body=$('#drawerBody');
-  body.innerHTML=`<div class="kv"><b>ID</b><span id="dwDevId" data-id="${d.id}">${d.id}</span><b>名称</b><span id="dwName">${d.name}</span><b>区域</b><span>${d.region} / ${d.city}</span><b>状态</b><span id="dwStatus"><span class="status ${d.status}">${d.status}</span></span><b>网络</b><span>${d.network}</span><b>版本</b><span id="dwVersion">${d.version} · seq ${d._seq}</span><b>更新</b><span id="dwLastUpdate">${new Date(d.lastUpdate).toLocaleString()}</span></div>
-  <div class="grid2"><div class="pill">CPU <b id="dwCpu">${d.cpu}%</b></div><div class="pill">内存 <b>${d.memory}%</b></div><div class="pill">温度 <b id="dwTemp">${fmt(d.temperature)}°C</b></div><div class="pill">功率 <b id="dwPower">${fmt(d.power)}W</b></div><div class="pill">电压 <b>${d.voltage}V</b></div><div class="pill">电流 <b>${d.current}A</b></div><div class="pill">延迟 <b id="dwLat">${d.latency}ms</b></div><div class="pill">电量 <b>${d.battery}%</b></div></div>
+  body.innerHTML=`<div class="kv"><b>ID</b><span id="dwDevId" data-id="${escapeHTML(d.id)}">${escapeHTML(d.id)}</span><b>名称</b><span id="dwName">${escapeHTML(d.name)}</span><b>区域</b><span>${escapeHTML(d.region)} / ${escapeHTML(d.city)}</span><b>状态</b><span id="dwStatus"><span class="status ${escapeHTML(d.status)}">${escapeHTML(d.status)}</span></span><b>网络</b><span>${escapeHTML(d.network)}</span><b>版本</b><span id="dwVersion">${d.version} · seq ${d._seq}</span><b>更新</b><span id="dwLastUpdate">${new Date(d.lastUpdate).toLocaleString()}</span></div>
+  <div class="grid2"><div class="pill">CPU <b id="dwCpu">${d.cpu}%</b></div><div class="pill">内存 <b>${d.memory}%</b></div><div class="pill">温度 <b id="dwTemp">${fmt(d.temperature)}°C</b></div><div class="pill">功率 <b id="dwPower">${fmt(d.power)}W</b></div><div class="pill">电压 <b>${d.voltage}V</b></div><div class="pill">电流 <b>${d.current}A</b></div><div class="pill">延迟 <b id="dwLat">${d.latency}ms</b></div><div class="pill">电量 <b id="dwBat">${d.battery}%</b></div></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" id="btnMoveToMaint">移至维护组 (乐观更新)</button><button class="btn small" id="btnAddTagToDev">添加标签</button><button class="btn small" id="btnDelDev">删除设备</button><button class="btn small" id="btnFetchDetail">模拟 fetchDetail (竞态)</button></div>
   <div id="fetchState" style="font-size:12px;color:var(--muted)"></div>
   <div class="charts"><div class="chart-wrap"><b style="font-size:12px">CPU</b><canvas id="cCpu"></canvas><div class="chart-tooltip" id="tipCpu"></div></div><div class="chart-wrap"><b style="font-size:12px">温度</b><canvas id="cTemp"></canvas><div class="chart-tooltip" id="tipTemp"></div></div><div class="chart-wrap"><b style="font-size:12px">功率</b><canvas id="cPower"></canvas><div class="chart-tooltip" id="tipPower"></div></div><div class="chart-wrap"><b style="font-size:12px">延迟</b><canvas id="cLat"></canvas><div class="chart-tooltip" id="tipLat"></div></div></div>
-  <div><b style="font-size:12px">历史告警</b><div id="dwAlarmList" style="font-size:12px;color:var(--muted)">${store.getState().alarms.filter(a=>a.deviceId===d.id).slice(0,5).map(a=>`· ${a.type} ${a.level} ${new Date(a.timestamp).toLocaleTimeString()}`).join('<br>')||'无'}</div></div>
+  <div><b style="font-size:12px">历史告警</b><div id="dwAlarmList" style="font-size:12px;color:var(--muted)">${store.getState().alarms.filter(a=>a.deviceId===d.id).slice(0,5).map(a=>`· ${escapeHTML(a.type)} ${escapeHTML(a.level)} ${new Date(a.timestamp).toLocaleTimeString()}`).join('<br>')||'无'}</div></div>
   `;
   $('#btnMoveToMaint').onclick=()=>optimisticMove(d.id);
   $('#btnAddTagToDev').onclick=()=>{const t=prompt('标签名'); if(t){ const cmd={execute(){d.tags=[...new Set([...d.tags,t])]; store.setState({}); recompute(); renderDrawer(d.id,true)}, undo(){d.tags=d.tags.filter(x=>x!==t); store.setState({}); recompute();}}; history.push(cmd); storage.debouncedSet('devices_patch',1)} };
@@ -799,7 +801,6 @@ function runBatch(type){
     batchTasks.push(t); taskQueue.add(t);
   }
   taskQueue.start(); updateBatchUI();
-  bus.on('task:progress',updateBatchUI); bus.on('task:completed',()=>{ recompute(); renderAlarms(); updateBatchUI(); toast('批量完成'); logger.info('Batch',type,{total:targets.length})});
   // optimistic history entry
   const snapTargets=targets.map(id=>{const d=store.getState().deviceMap.get(id); return {id,groupIds:[...d.groupIds],status:d.status,tags:[...d.tags]}});
   history.push({execute(){},undo(){ snapTargets.forEach(s=>{const d=store.getState().deviceMap.get(s.id); if(d){d.groupIds=s.groupIds; d.status=s.status; d.tags=s.tags}}); recompute();}});
@@ -811,6 +812,9 @@ function init(){
   // theme
   document.documentElement.setAttribute('data-theme', store.getState().ui.theme);
   $('#btnTheme').textContent= store.getState().ui.theme==='dark'?'☀️ 浅色':'🌙 深色';
+  // task listeners (registered once)
+  bus.on('task:progress',updateBatchUI);
+  bus.on('task:completed',()=>{ recompute(); renderAlarms(); updateBatchUI(); toast('批量完成'); logger.info('Batch','completed',{}); });
   // generate devices
   const t0=performance.now(); const {arr,map}=genDevices(50000); store.setState({devices:arr,deviceMap:map}); logger.info('Init',`generated 50000 in ${fmt(performance.now()-t0,1)}ms`,{});
   // restore persisted
@@ -968,7 +972,7 @@ $('#cmdModal').onclick=(e)=>{if(e.target.id==='cmdModal') e.currentTarget.classL
 // import/export
 function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('#btnExportCsv').onclick=()=>{
-  const rows=filteredSorted; if(!rows.length) return toast('无数据可导出'); const header=['id','name','region','city','status','cpu','temperature','power','latency','battery','version']; const csv=[header.join(',')].concat(rows.slice(0,10000).map(d=> header.map(k=> JSON.stringify(d[k]??'')).join(','))).join('\n'); download('devices.csv',csv,'text/csv'); logger.info('Export','csv',{count:rows.length})
+  const rows=filteredSorted; if(!rows.length) return toast('无数据可导出'); const header=['id','name','region','city','status','cpu','temperature','power','latency','battery','version']; const csv=[header.join(',')].concat(rows.slice(0,10000).map(d=> header.map(k=> escapeCsvCell(d[k]??'')).join(','))).join('\n'); download('devices.csv',csv,'text/csv'); logger.info('Export','csv',{count:rows.length})
 };
 $('#btnExportJson').onclick=()=>{
   const data=filteredSorted.slice(0,10000); download('devices.json',JSON.stringify(data,null,2),'application/json'); logger.info('Export','json',{count:data.length})
@@ -984,7 +988,7 @@ $('#importFile').onchange=async (e)=>{
       else { seen.add(d.id); normalized.push({id:d.id,name:d.name||d.id,region:d.region||'华东',city:d.city||'上海',status:d.status||'online',cpu:Number(d.cpu)||0,temperature:Number(d.temperature)||0,power:Number(d.power)||0,latency:Number(d.latency)||0,battery:Number(d.battery)||0,voltage:220,current:1,groupIds:[],tags:[],version:1,lastUpdate:Date.now(),history:[]})}
     });
     // preview
-    $('#importModal').classList.add('open'); $('#importBody').innerHTML=`<div style="font-size:12px">解析: ${json.length} 条 · 有效 ${normalized.length} 条 · 错误 ${errors.length} 条</div><div style="max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px;margin-top:8px;font-family:monospace;font-size:12px">${errors.slice(0,20).map(e=>`<div style="color:var(--danger)">${e}</div>`).join('')||'<div style="color:var(--success)">无错误</div>'}<hr>${normalized.slice(0,3).map(d=>`<div>${JSON.stringify(d).slice(0,140)}</div>`).join('')}</div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" id="btnConfirmImport">确认导入</button><button class="btn" id="btnCancelImport">取消</button></div>`;
+    $('#importModal').classList.add('open'); $('#importBody').innerHTML=`<div style="font-size:12px">解析: ${json.length} 条 · 有效 ${normalized.length} 条 · 错误 ${errors.length} 条</div><div style="max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px;margin-top:8px;font-family:monospace;font-size:12px">${errors.slice(0,20).map(e=>`<div style="color:var(--danger)">${escapeHTML(e)}</div>`).join('')||'<div style="color:var(--success)">无错误</div>'}<hr>${normalized.slice(0,3).map(d=>`<div>${escapeHTML(JSON.stringify(d).slice(0,140))}</div>`).join('')}</div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" id="btnConfirmImport">确认导入</button><button class="btn" id="btnCancelImport">取消</button></div>`;
     $('#btnCancelImport').onclick=()=>$('#importModal').classList.remove('open');
     $('#btnConfirmImport').onclick=()=>{
       if(errors.length && !confirm(`有 ${errors.length} 条错误，仍导入有效数据？`)) return;
@@ -1011,6 +1015,7 @@ document.addEventListener('keydown',(e)=>{
   if(e.key==='ArrowDown' || e.key==='ArrowUp'){ if(document.activeElement===document.body || document.activeElement.id==='viewport' || $('#viewport').contains(document.activeElement)){ e.preventDefault(); const idx=filteredSorted.findIndex(d=>d.id===currentDrawerId); let next= idx>=0? idx + (e.key==='ArrowDown'?1:-1) : 0; next=clamp(next,0,filteredSorted.length-1); const dev=filteredSorted[next]; if(dev){ openDrawer(dev.id); vlist.scrollToIndex(next); // maintain selection
         const sel=new Set(); sel.add(dev.id); store.setState({selection:sel}); updateSelectInfo(); vlist.render(); } } }
   if(e.key==='Enter' && document.activeElement.closest('.cmd-item')){ document.activeElement.click(); }
+  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
   if(e.key==='Home'){ vlist.scrollToIndex(0)} if(e.key==='End'){ vlist.scrollToIndex(filteredSorted.length-1)}
 });
 $('#cmdInput').addEventListener('keydown',(e)=>{

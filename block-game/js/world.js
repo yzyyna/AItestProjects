@@ -261,8 +261,11 @@
       if (!o || typeof o !== 'object') return;
       var m = new Map();
       Object.keys(o).forEach(function (idx) {
+        var nIdx = +idx;
         var id = o[idx];
-        if (typeof id === 'number') m.set(+idx, id);
+        if (Number.isInteger(nIdx) && nIdx >= 0 && nIdx < 16384 && Number.isInteger(id) && id >= 0 && id <= 255) {
+          m.set(nIdx, id);
+        }
       });
       self.edits.set(k, m);
     });

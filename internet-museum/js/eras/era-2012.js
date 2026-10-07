@@ -81,7 +81,7 @@ export function initEra2012() {
           <div class="feed-avatar">🌟</div>
           <div class="feed-info">
             <span class="feed-name">唯美主义者丶 (黄钻Lv.7)</span>
-            <span class="feed-time">${item.time} · ${item.source}</span>
+            <span class="feed-time">${escapeHTML(item.time)} · ${escapeHTML(item.source)}</span>
           </div>
         </div>
         <div class="feed-content">${escapeHTML(item.text)}</div>
@@ -160,9 +160,11 @@ function spawnFlyingHeart(btn) {
 }
 
 function escapeHTML(str) {
+  if (str == null) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

@@ -390,7 +390,7 @@ footer {
 </footer>
 
 <script>
-function loadPreview(url, title, triggerBtn) {
+function setPreview(url, title, tabEl, scrollToView) {
   var frame = document.getElementById('previewFrame');
   var titleEl = document.getElementById('previewTitle');
   frame.src = url;
@@ -398,22 +398,22 @@ function loadPreview(url, title, triggerBtn) {
 
   document.querySelectorAll('.preview-tab').forEach(function(tab) {
     tab.classList.remove('active');
-    if (tab.getAttribute('onclick').indexOf(url) !== -1) {
+    if (tab === tabEl || (!tabEl && tab.getAttribute('onclick') && tab.getAttribute('onclick').indexOf(url) !== -1)) {
       tab.classList.add('active');
     }
   });
 
-  document.querySelector('.preview-section').scrollIntoView({ behavior: 'smooth' });
+  if (scrollToView) {
+    document.querySelector('.preview-section').scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+function loadPreview(url, title, triggerBtn) {
+  setPreview(url, title, null, true);
 }
 
 function switchPreview(url, title, tabEl) {
-  var frame = document.getElementById('previewFrame');
-  var titleEl = document.getElementById('previewTitle');
-  frame.src = url;
-  titleEl.textContent = '当前预览：' + title;
-
-  document.querySelectorAll('.preview-tab').forEach(function(t) { t.classList.remove('active'); });
-  tabEl.classList.add('active');
+  setPreview(url, title, tabEl, false);
 }
 </script>
 

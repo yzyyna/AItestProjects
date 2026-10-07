@@ -142,6 +142,10 @@ const defaultState = {
   restorationComplete: false
 };
 
+function cloneDefaultState() {
+  return JSON.parse(JSON.stringify(defaultState));
+}
+
 class MuseumStore {
   constructor() {
     this.state = this.loadState();
@@ -149,16 +153,41 @@ class MuseumStore {
   }
 
   loadState() {
+    const base = cloneDefaultState();
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...defaultState, ...parsed };
+        if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.eggs)) base.eggs = parsed.eggs.filter(x => typeof x === 'string');
+          if (typeof parsed.soundEnabled === 'boolean') base.soundEnabled = parsed.soundEnabled;
+          if (typeof parsed.crtEffect === 'boolean') base.crtEffect = parsed.crtEffect;
+          if (typeof parsed.currentEra === 'number') base.currentEra = parsed.currentEra;
+          if (typeof parsed.connected1998 === 'boolean') base.connected1998 = parsed.connected1998;
+          if (typeof parsed.counter2003 === 'number') base.counter2003 = Math.max(0, parsed.counter2003 | 0);
+          if (typeof parsed.music2003Playing === 'boolean') base.music2003Playing = parsed.music2003Playing;
+          if (Array.isArray(parsed.guestbookMessages)) base.guestbookMessages = parsed.guestbookMessages;
+          if (Array.isArray(parsed.forumPosts)) base.forumPosts = parsed.forumPosts;
+          if (typeof parsed.forumSignature === 'string') base.forumSignature = parsed.forumSignature;
+          if (typeof parsed.spaceSkin === 'string') base.spaceSkin = parsed.spaceSkin;
+          if (typeof parsed.spaceDecorScore === 'number') base.spaceDecorScore = Math.min(100, Math.max(0, parsed.spaceDecorScore | 0));
+          if (Array.isArray(parsed.spacePosts)) base.spacePosts = parsed.spacePosts;
+          if (parsed.algorithmPreference && typeof parsed.algorithmPreference === 'object') {
+            base.algorithmPreference = {
+              cat: Number(parsed.algorithmPreference.cat) || 0,
+              productivity: Number(parsed.algorithmPreference.productivity) || 0,
+              emotion: Number(parsed.algorithmPreference.emotion) || 0
+            };
+          }
+          if (Array.isArray(parsed.algorithmDismissed)) base.algorithmDismissed = parsed.algorithmDismissed;
+          if (Array.isArray(parsed.restoredFragments)) base.restoredFragments = parsed.restoredFragments.filter(x => typeof x === 'string');
+          if (typeof parsed.restorationComplete === 'boolean') base.restorationComplete = parsed.restorationComplete;
+        }
       }
     } catch (e) {
       console.warn('Failed to load state from localStorage:', e);
     }
-    return { ...defaultState };
+    return base;
   }
 
   saveState() {
@@ -210,7 +239,7 @@ class MuseumStore {
   }
 
   resetAll() {
-    this.state = { ...defaultState };
+    this.state = cloneDefaultState();
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (e) {}

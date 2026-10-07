@@ -66,7 +66,7 @@ export function initEra2099() {
   let restoredIds = [...(museumStore.getState().restoredFragments || [])];
   let selectedFragId = null;
 
-  function updateProgressUI() {
+  function updateProgressUI(isInit = false) {
     const total = FRAGMENTS_CONFIG.length;
     const count = restoredIds.length;
     const percent = Math.round((count / total) * 100);
@@ -81,7 +81,9 @@ export function initEra2099() {
         restorationComplete: true,
         restoredFragments: restoredIds
       });
-      eggsManager.triggerEgg('restored_memory');
+      if (!isInit) {
+        eggsManager.triggerEgg('restored_memory');
+      }
     }
   }
 
@@ -275,5 +277,5 @@ export function initEra2099() {
   }
 
   renderSlotsAndFragments();
-  updateProgressUI();
+  updateProgressUI(true);
 }

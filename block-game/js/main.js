@@ -71,7 +71,7 @@
         }
       }
       if (saved.settings) {
-        if (saved.settings.renderDist) settings.renderDist = saved.settings.renderDist;
+        if (saved.settings.renderDist) settings.renderDist = Math.max(3, Math.min(12, saved.settings.renderDist | 0));
         settings.muted = !!saved.settings.muted;
       }
       if (saved.stats) {
@@ -637,17 +637,21 @@
     for (var ti = tntList.length - 1; ti >= 0; ti--) {
       var tnt = tntList[ti];
       tnt.fuse -= dt;
-      tnt.vy -= 16 * dt;
+      var prevTntY = tnt.y;
+      tnt.vy = Math.max(-25, tnt.vy - 16 * dt);
       tnt.x += tnt.vx * dt;
       tnt.y += tnt.vy * dt;
       tnt.z += tnt.vz * dt;
-      var gy = Math.floor(tnt.y);
-      var gb = world.getBlock(Math.floor(tnt.x), gy, Math.floor(tnt.z));
-      if (MC.isSolid(gb)) {
-        tnt.y = gy + 1.0;
-        tnt.vy = 0;
-        tnt.vx *= 0.75;
-        tnt.vz *= 0.75;
+      var checkMinTY = Math.floor(tnt.y);
+      var checkMaxTY = Math.floor(prevTntY);
+      for (var cy = checkMaxTY; cy >= checkMinTY; cy--) {
+        if (MC.isSolid(world.getBlock(Math.floor(tnt.x), cy, Math.floor(tnt.z)))) {
+          tnt.y = cy + 1.0;
+          tnt.vy = 0;
+          tnt.vx *= 0.75;
+          tnt.vz *= 0.75;
+          break;
+        }
       }
       if (tnt.fuse <= 0) {
         tntList.splice(ti, 1);
@@ -661,19 +665,23 @@
       var drop = dropList[di];
       drop.age += dt;
       drop.rot += dt * 3.6;
-      drop.vy -= 16 * dt;
+      var prevDropY = drop.y;
+      drop.vy = Math.max(-20, drop.vy - 16 * dt);
       drop.x += drop.vx * dt;
       drop.y += drop.vy * dt;
       drop.z += drop.vz * dt;
 
-      /* 简易地面碰撞与悬浮轻漾微动 */
-      var fgy = Math.floor(drop.y);
-      var fgb = world.getBlock(Math.floor(drop.x), fgy, Math.floor(drop.z));
-      if (MC.isSolid(fgb)) {
-        drop.y = fgy + 1.05 + Math.sin(drop.age * 4.0 + drop.bobOffset) * 0.06;
-        drop.vy = 0;
-        drop.vx *= 0.75;
-        drop.vz *= 0.75;
+      /* 简易地面碰撞与悬浮轻漾微动（防穿透多阶检测） */
+      var checkMinDY = Math.floor(drop.y);
+      var checkMaxDY = Math.floor(prevDropY);
+      for (var dcy = checkMaxDY; dcy >= checkMinDY; dcy--) {
+        if (MC.isSolid(world.getBlock(Math.floor(drop.x), dcy, Math.floor(drop.z)))) {
+          drop.y = dcy + 1.05 + Math.sin(drop.age * 4.0 + drop.bobOffset) * 0.06;
+          drop.vy = 0;
+          drop.vx *= 0.75;
+          drop.vz *= 0.75;
+          break;
+        }
       }
 
       /* 玩家磁吸检测 (3.2m 内自动加速飞向玩家身体中心) */

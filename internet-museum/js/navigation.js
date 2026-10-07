@@ -191,7 +191,8 @@ export class NavigationManager {
       behavior: smooth ? 'smooth' : 'auto'
     });
 
-    setTimeout(() => {
+    if (this._programmaticTimer) clearTimeout(this._programmaticTimer);
+    this._programmaticTimer = setTimeout(() => {
       this.isProgrammaticScroll = false;
       this.updateIndicators(targetEra.year);
     }, smooth ? 450 : 50);

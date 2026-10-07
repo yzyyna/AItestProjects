@@ -1100,11 +1100,13 @@ class InputManager {
     this.pinch = null;
     this.dragging = false;
     this.moved = 0;
+    this.lastAct = 0;
     this.hoverX = -1; this.hoverY = -1; this.hoverActive = false;
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     canvas.addEventListener('pointerdown', e => {
       try { canvas.setPointerCapture(e.pointerId); } catch {}
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), b: e.button });
+      this.lastAct = performance.now();
       this.moved = 0;
       this.dragging = true;
       if (this.pointers.size === 2) this.pinchInit();
@@ -1118,6 +1120,7 @@ class InputManager {
       }
       const dx = e.clientX - p.x, dy = e.clientY - p.y;
       p.x = e.clientX; p.y = e.clientY;
+      this.lastAct = performance.now();
       this.moved += Math.abs(dx) + Math.abs(dy);
       if (this.pointers.size === 2 && this.pinch) {
         this.pinchMove();
@@ -1140,6 +1143,8 @@ class InputManager {
     };
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
     canvas.addEventListener('pointerleave', () => { this.hoverActive = false; });
     canvas.addEventListener('wheel', e => {
       e.preventDefault();
@@ -1159,6 +1164,13 @@ class InputManager {
       this.cam.pan(mx - this.pinch.mx, my - this.pinch.my);
       this.pinch.d = d; this.pinch.mx = mx; this.pinch.my = my;
     };
+  }
+  tick() {
+    if (this.dragging && this.lastAct && performance.now() - this.lastAct > 3000) {
+      this.pointers.clear();
+      this.pinch = null;
+      this.dragging = false;
+    }
   }
 }
 
@@ -2722,6 +2734,7 @@ class App {
       const st = this.state;
       st.update(this.tSec, dt);
       this.camera.update(dt, st.settings.autoRotate, this.input.dragging);
+      this.input.tick();
       this.scene.update(dt, this.tSec, this.camera, window.innerWidth, window.innerHeight);
       this.#handleHover();
       if (st.selection && this.tSec - this.tooltipT > 0.15) {

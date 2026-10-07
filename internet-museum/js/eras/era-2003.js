@@ -114,7 +114,7 @@ export function initEra2003() {
       item.innerHTML = `
         <div class="msg-header">
           <span class="msg-author">🌸 ${escapeHTML(msg.name)}</span>
-          <span class="msg-time">${msg.time}</span>
+          <span class="msg-time">${escapeHTML(msg.time)}</span>
         </div>
         <div class="msg-body">${escapeHTML(msg.text)}</div>
         ${msg.reply ? `<div class="msg-reply"><strong>站长回复：</strong>${escapeHTML(msg.reply)}</div>` : ''}
@@ -195,9 +195,11 @@ function createSparkle(x, y) {
 }
 
 function escapeHTML(str) {
+  if (str == null) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

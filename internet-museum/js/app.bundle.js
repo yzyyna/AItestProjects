@@ -145,6 +145,10 @@ const defaultState = {
   restorationComplete: false
 };
 
+function cloneDefaultState() {
+  return JSON.parse(JSON.stringify(defaultState));
+}
+
 class MuseumStore {
   constructor() {
     this.state = this.loadState();
@@ -152,16 +156,41 @@ class MuseumStore {
   }
 
   loadState() {
+    const base = cloneDefaultState();
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...defaultState, ...parsed };
+        if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.eggs)) base.eggs = parsed.eggs.filter(x => typeof x === 'string');
+          if (typeof parsed.soundEnabled === 'boolean') base.soundEnabled = parsed.soundEnabled;
+          if (typeof parsed.crtEffect === 'boolean') base.crtEffect = parsed.crtEffect;
+          if (typeof parsed.currentEra === 'number') base.currentEra = parsed.currentEra;
+          if (typeof parsed.connected1998 === 'boolean') base.connected1998 = parsed.connected1998;
+          if (typeof parsed.counter2003 === 'number') base.counter2003 = Math.max(0, parsed.counter2003 | 0);
+          if (typeof parsed.music2003Playing === 'boolean') base.music2003Playing = parsed.music2003Playing;
+          if (Array.isArray(parsed.guestbookMessages)) base.guestbookMessages = parsed.guestbookMessages;
+          if (Array.isArray(parsed.forumPosts)) base.forumPosts = parsed.forumPosts;
+          if (typeof parsed.forumSignature === 'string') base.forumSignature = parsed.forumSignature;
+          if (typeof parsed.spaceSkin === 'string') base.spaceSkin = parsed.spaceSkin;
+          if (typeof parsed.spaceDecorScore === 'number') base.spaceDecorScore = Math.min(100, Math.max(0, parsed.spaceDecorScore | 0));
+          if (Array.isArray(parsed.spacePosts)) base.spacePosts = parsed.spacePosts;
+          if (parsed.algorithmPreference && typeof parsed.algorithmPreference === 'object') {
+            base.algorithmPreference = {
+              cat: Number(parsed.algorithmPreference.cat) || 0,
+              productivity: Number(parsed.algorithmPreference.productivity) || 0,
+              emotion: Number(parsed.algorithmPreference.emotion) || 0
+            };
+          }
+          if (Array.isArray(parsed.algorithmDismissed)) base.algorithmDismissed = parsed.algorithmDismissed;
+          if (Array.isArray(parsed.restoredFragments)) base.restoredFragments = parsed.restoredFragments.filter(x => typeof x === 'string');
+          if (typeof parsed.restorationComplete === 'boolean') base.restorationComplete = parsed.restorationComplete;
+        }
       }
     } catch (e) {
       console.warn('Failed to load state from localStorage:', e);
     }
-    return { ...defaultState };
+    return base;
   }
 
   saveState() {
@@ -213,7 +242,7 @@ class MuseumStore {
   }
 
   resetAll() {
-    this.state = { ...defaultState };
+    this.state = cloneDefaultState();
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (e) {}
@@ -302,8 +331,7 @@ class AudioManager {
 
   // 1998 经典拨号声合成（双音多频 DTMF + 调制解调器握手噪波）
   playDialup(onProgress, onComplete) {
-    if (!this.isSoundEnabled()) {
-      // 声音关闭时，仅通过定时器通知步骤
+    const playFallbackSteps = () => {
       const steps = [
         { text: '初始化端口 COM1...', delay: 600 },
         { text: '正在拨号 ATDT 16300...', delay: 1800 },
@@ -320,11 +348,18 @@ class AudioManager {
       setTimeout(() => {
         if (onComplete) onComplete();
       }, 7200);
+    };
+
+    if (!this.isSoundEnabled()) {
+      playFallbackSteps();
       return;
     }
 
     this.ensureContext();
-    if (!this.ctx) return;
+    if (!this.ctx) {
+      playFallbackSteps();
+      return;
+    }
 
     const now = this.ctx.currentTime;
 
@@ -342,7 +377,7 @@ class AudioManager {
       osc1.frequency.value = pair[0];
       osc2.frequency.value = pair[1];
       g.gain.setValueAtTime(0.08, toneTime);
-      g.gain.setValueAtTime(0.001, toneTime + 0.14);
+      g.gain.exponentialRampToValueAtTime(0.001, toneTime + 0.14);
 
       osc1.connect(g);
       osc2.connect(g);
@@ -840,7 +875,8 @@ class NavigationManager {
       behavior: smooth ? 'smooth' : 'auto'
     });
 
-    setTimeout(() => {
+    if (this._programmaticTimer) clearTimeout(this._programmaticTimer);
+    this._programmaticTimer = setTimeout(() => {
       this.isProgrammaticScroll = false;
       this.updateIndicators(targetEra.year);
     }, smooth ? 450 : 50);
@@ -1492,7 +1528,7 @@ function initEra2003() {
       item.innerHTML = `
         <div class="msg-header">
           <span class="msg-author">🌸 ${escapeHTML(msg.name)}</span>
-          <span class="msg-time">${msg.time}</span>
+          <span class="msg-time">${escapeHTML(msg.time)}</span>
         </div>
         <div class="msg-body">${escapeHTML(msg.text)}</div>
         ${msg.reply ? `<div class="msg-reply"><strong>站长回复：</strong>${escapeHTML(msg.reply)}</div>` : ''}
@@ -1573,11 +1609,13 @@ function createSparkle(x, y) {
 }
 
 function escapeHTML(str) {
+  if (str == null) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 
@@ -1935,7 +1973,7 @@ function initEra2012() {
           <div class="feed-avatar">🌟</div>
           <div class="feed-info">
             <span class="feed-name">唯美主义者丶 (黄钻Lv.7)</span>
-            <span class="feed-time">${item.time} · ${item.source}</span>
+            <span class="feed-time">${escapeHTML(item.time)} · ${escapeHTML(item.source)}</span>
           </div>
         </div>
         <div class="feed-content">${escapeHTML(item.text)}</div>
@@ -2014,11 +2052,13 @@ function spawnFlyingHeart(btn) {
 }
 
 function escapeHTML(str) {
+  if (str == null) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 
@@ -2147,7 +2187,15 @@ function initEra2024() {
   }
 
   // 2. 渲染推荐信息流卡片
+  const activeHoverTimers = new Set();
+
+  function clearAllHoverTimers() {
+    activeHoverTimers.forEach(t => clearTimeout(t));
+    activeHoverTimers.clear();
+  }
+
   function renderFeedCards() {
+    clearAllHoverTimers();
     if (!feedListEl) return;
     feedListEl.innerHTML = '';
 
@@ -2202,14 +2250,19 @@ function initEra2024() {
     let hoverTimer = null;
     card.addEventListener('mouseenter', () => {
       hoverTimer = setTimeout(() => {
+        activeHoverTimers.delete(hoverTimer);
         preference[catObj.key] = (preference[catObj.key] || 0) + 1;
         saveAndRefresh();
         showMicroFeedback(card, '视线停留 +1 分');
       }, 2000);
+      activeHoverTimers.add(hoverTimer);
     });
 
     card.addEventListener('mouseleave', () => {
-      clearTimeout(hoverTimer);
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        activeHoverTimers.delete(hoverTimer);
+      }
     });
 
     // 点开/点击卡片加 3 分
@@ -2369,7 +2422,7 @@ function initEra2099() {
   let restoredIds = [...(museumStore.getState().restoredFragments || [])];
   let selectedFragId = null;
 
-  function updateProgressUI() {
+  function updateProgressUI(isInit = false) {
     const total = FRAGMENTS_CONFIG.length;
     const count = restoredIds.length;
     const percent = Math.round((count / total) * 100);
@@ -2384,7 +2437,9 @@ function initEra2099() {
         restorationComplete: true,
         restoredFragments: restoredIds
       });
-      eggsManager.triggerEgg('restored_memory');
+      if (!isInit) {
+        eggsManager.triggerEgg('restored_memory');
+      }
     }
   }
 
@@ -2578,7 +2633,7 @@ function initEra2099() {
   }
 
   renderSlotsAndFragments();
-  updateProgressUI();
+  updateProgressUI(true);
 }
 
 

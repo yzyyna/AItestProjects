@@ -659,6 +659,12 @@
         return;
       }
 
+      // 弹窗打开状态下屏蔽背景动作快捷键
+      const isModalOpen = modalWardrobe.classList.contains('open') ||
+                          modalTimeMachine.classList.contains('open') ||
+                          modalResignation.classList.contains('open');
+      if (isModalOpen) return;
+
       const btnId = btnMap[key];
       if (btnId) {
         const btn = document.getElementById(btnId);

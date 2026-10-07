@@ -3,6 +3,17 @@
  * Pure Vanilla JavaScript (Zero External Dependencies)
  */
 
+// HTML Escape Helper
+function escapeHTML(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Offline-ready SVG Avatar Generator
 function getAvatarSvg(seed) {
   const s = String(seed || 'User').trim();
@@ -52,9 +63,36 @@ function loadState() {
     const saved = localStorage.getItem('linguajourney_state');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.user) STATE.user = parsed.user;
-      if (parsed.progress) STATE.progress = parsed.progress;
-      if (parsed.posts) STATE.posts = parsed.posts;
+      if (parsed.user && typeof parsed.user === 'object' && typeof parsed.user.name === 'string') {
+        STATE.user = {
+          name: parsed.user.name.slice(0, 30),
+          avatar: typeof parsed.user.avatar === 'string' && parsed.user.avatar.startsWith('data:image/svg+xml')
+            ? parsed.user.avatar
+            : getAvatarSvg(parsed.user.name)
+        };
+      }
+      if (parsed.progress && typeof parsed.progress === 'object') {
+        STATE.progress = {
+          ...STATE.progress,
+          level: Math.max(1, Math.floor(Number(parsed.progress.level) || 1)),
+          exp: Math.max(0, Math.floor(Number(parsed.progress.exp) || 0)),
+          completedModules: Array.isArray(parsed.progress.completedModules) ? parsed.progress.completedModules : ['m1']
+        };
+      }
+      if (Array.isArray(parsed.posts) && parsed.posts.length > 0) {
+        STATE.posts = parsed.posts.map(p => ({
+          id: p.id || Date.now(),
+          author: String(p.author || '学员').slice(0, 30),
+          avatar: typeof p.avatar === 'string' && p.avatar.startsWith('data:image/svg+xml')
+            ? p.avatar
+            : getAvatarSvg(p.author || 'User'),
+          content: String(p.content || '').slice(0, 500),
+          likes: Math.max(0, Math.floor(Number(p.likes) || 0)),
+          comments: Math.max(0, Math.floor(Number(p.comments) || 0)),
+          time: String(p.time || '刚刚').slice(0, 20),
+          liked: Boolean(p.liked)
+        }));
+      }
     }
   } catch (e) {
     console.warn('Failed to load state from localStorage', e);
@@ -416,16 +454,24 @@ function renderCommunity() {
   const feedEl = document.getElementById('community-feed');
   if (!feedEl) return;
 
-  feedEl.innerHTML = STATE.posts.map(post => `
+  feedEl.innerHTML = STATE.posts.map(post => {
+    const safeAuthor = escapeHTML(post.author);
+    const safeContent = escapeHTML(post.content);
+    const safeTime = escapeHTML(post.time);
+    const safeAvatar = typeof post.avatar === 'string' && post.avatar.startsWith('data:image/svg+xml')
+      ? post.avatar
+      : getAvatarSvg(post.author);
+
+    return `
     <div class="post-card">
       <div class="post-header">
-        <img class="user-avatar" src="${post.avatar}" alt="${post.author}">
+        <img class="user-avatar" src="${safeAvatar}" alt="${safeAuthor}">
         <div>
-          <div style="font-weight:700;font-size:14px">${post.author}</div>
-          <div style="font-size:12px;color:var(--text-light)">${post.time}</div>
+          <div style="font-weight:700;font-size:14px">${safeAuthor}</div>
+          <div style="font-size:12px;color:var(--text-light)">${safeTime}</div>
         </div>
       </div>
-      <div class="post-content">${post.content}</div>
+      <div class="post-content">${safeContent}</div>
       <div class="post-actions">
         <button class="action-btn ${post.liked ? 'liked' : ''}" onclick="toggleLike(${post.id})">
           <svg viewBox="0 0 24 24" fill="${post.liked ? '#ef4444' : 'none'}" stroke="${post.liked ? '#ef4444' : 'currentColor'}" stroke-width="2" width="16" height="16">
@@ -448,7 +494,8 @@ function renderCommunity() {
         </button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function submitNewPost() {
