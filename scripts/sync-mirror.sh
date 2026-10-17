@@ -6,7 +6,8 @@
 set -euo pipefail
 
 # 对自身做语法自检（轻量常驻；全量 bash -n 门会拖慢提交，故只自检自身）
-bash -n "$0" || { echo "sync-mirror.sh 自身语法错误" >&2; exit 1; }
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+bash -n "$SELF" || { echo "sync-mirror.sh 自身语法错误" >&2; exit 1; }
 
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 DST="${MIRROR_DST:-/Users/fortrust/Documents/Projects/gitee/https-website-cloudflare/ai}"

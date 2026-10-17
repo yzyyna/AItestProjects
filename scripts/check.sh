@@ -4,10 +4,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$ROOT"
 
 # 对自身做语法自检（轻量常驻；全量 bash -n 门会拖慢提交，故只自检自身）
-bash -n "$0" || { echo "check.sh 自身语法错误" >&2; exit 1; }
+bash -n "$SELF" || { echo "check.sh 自身语法错误" >&2; exit 1; }
 
 status=0
 touched_cyber=0
