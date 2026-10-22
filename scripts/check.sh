@@ -12,6 +12,7 @@ bash -n "$SELF" || { echo "check.sh 自身语法错误" >&2; exit 1; }
 
 status=0
 touched_cyber=0
+touched_loop=0
 
 check_file() {
   local f="$1"
@@ -58,6 +59,7 @@ while IFS= read -r -d '' entry; do
   check_file "$f"
   case "$f" in
     cyber-potato/*) touched_cyber=1 ;;
+    loop-heist/*) touched_loop=1 ;;
   esac
 done < <(git status --porcelain --untracked-files=all -z)
 
@@ -67,6 +69,10 @@ node stellar-fusion/build.js --check || status=1
 
 if (( touched_cyber )); then
   node cyber-potato/test.js || status=1
+fi
+
+if (( touched_loop )); then
+  node loop-heist/test.js || status=1
 fi
 
 if [[ $status -eq 0 ]]; then
