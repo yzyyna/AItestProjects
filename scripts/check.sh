@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 提交前校验：只检查当前改动涉及的文件，外加两个生成物的新鲜度与 cyber-potato 单元测试。
+# 提交前校验：只检查当前改动涉及的文件，外加两个生成物的新鲜度与单元测试。
 # 自检：bash -n scripts/check.sh
 set -euo pipefail
 
@@ -13,6 +13,7 @@ bash -n "$SELF" || { echo "check.sh 自身语法错误" >&2; exit 1; }
 status=0
 touched_cyber=0
 touched_loop=0
+touched_cell=0
 
 check_file() {
   local f="$1"
@@ -60,6 +61,7 @@ while IFS= read -r -d '' entry; do
   case "$f" in
     cyber-potato/*) touched_cyber=1 ;;
     loop-heist/*) touched_loop=1 ;;
+    cell-defense/*) touched_cell=1 ;;
   esac
 done < <(git status --porcelain --untracked-files=all -z)
 
@@ -73,6 +75,10 @@ fi
 
 if (( touched_loop )); then
   node loop-heist/test.js || status=1
+fi
+
+if (( touched_cell )); then
+  node cell-defense/test.js || status=1
 fi
 
 if [[ $status -eq 0 ]]; then
