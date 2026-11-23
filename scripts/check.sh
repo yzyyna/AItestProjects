@@ -14,6 +14,8 @@ status=0
 touched_cyber=0
 touched_loop=0
 touched_cell=0
+touched_lang=0
+touched_museum=0
 
 check_file() {
   local f="$1"
@@ -62,6 +64,8 @@ while IFS= read -r -d '' entry; do
     cyber-potato/*) touched_cyber=1 ;;
     loop-heist/*) touched_loop=1 ;;
     cell-defense/*) touched_cell=1 ;;
+    learn-lang/*) touched_lang=1 ;;
+    internet-museum/*) touched_museum=1 ;;
   esac
 done < <(git status --porcelain --untracked-files=all -z)
 
@@ -79,6 +83,14 @@ fi
 
 if (( touched_cell )); then
   node cell-defense/test.js || status=1
+fi
+
+if (( touched_lang )); then
+  node learn-lang/test.js || status=1
+fi
+
+if (( touched_museum )); then
+  node internet-museum/test.js || status=1
 fi
 
 if [[ $status -eq 0 ]]; then
